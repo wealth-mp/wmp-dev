@@ -9151,7 +9151,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "ɵPRE_STYLE": () => (/* binding */ ɵPRE_STYLE)
 /* harmony export */ });
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -9632,170 +9632,148 @@ function keyframes(steps) {
     return { type: 5 /* Keyframes */, steps };
 }
 /**
- * Declares an animation transition as a sequence of animation steps to run when a given
- * condition is satisfied. The condition is a Boolean expression or function that compares
- * the previous and current animation states, and returns true if this transition should occur.
- * When the state criteria of a defined transition are met, the associated animation is
- * triggered.
+ * Declares an animation transition which is played when a certain specified condition is met.
  *
- * @param stateChangeExpr A Boolean expression or function that compares the previous and current
- * animation states, and returns true if this transition should occur. Note that  "true" and "false"
- * match 1 and 0, respectively. An expression is evaluated each time a state change occurs in the
- * animation trigger element.
- * The animation steps run when the expression evaluates to true.
+ * @param stateChangeExpr A string with a specific format or a function that specifies when the
+ * animation transition should occur (see [State Change Expression](#state-change-expression)).
  *
- * - A state-change string takes the form "state1 => state2", where each side is a defined animation
- * state, or an asterisk (*) to refer to a dynamic start or end state.
- *   - The expression string can contain multiple comma-separated statements;
- * for example "state1 => state2, state3 => state4".
- *   - Special values `:enter` and `:leave` initiate a transition on the entry and exit states,
- * equivalent to  "void => *"  and "* => void".
- *   - Special values `:increment` and `:decrement` initiate a transition when a numeric value has
- * increased or decreased in value.
- * - A function is executed each time a state change occurs in the animation trigger element.
- * The animation steps run when the function returns true.
+ * @param steps One or more animation objects that represent the animation's instructions.
  *
- * @param steps One or more animation objects, as returned by the `animate()` or
- * `sequence()` function, that form a transformation from one state to another.
- * A sequence is used by default when you pass an array.
- * @param options An options object that can contain a delay value for the start of the animation,
- * and additional developer-defined parameters. Provided values for additional parameters are used
- * as defaults, and override values can be passed to the caller on invocation.
+ * @param options An options object that can be used to specify a delay for the animation or provide
+ * custom parameters for it.
+ *
  * @returns An object that encapsulates the transition data.
  *
  * @usageNotes
- * The template associated with a component binds an animation trigger to an element.
  *
- * ```HTML
- * <!-- somewhere inside of my-component-tpl.html -->
- * <div [@myAnimationTrigger]="myStatusExp">...</div>
- * ```
+ * ### State Change Expression
  *
- * All transitions are defined within an animation trigger,
- * along with named states that the transitions change to and from.
+ * The State Change Expression instructs Angular when to run the transition's animations, it can
+ *either be
+ *  - a string with a specific syntax
+ *  - or a function that compares the previous and current state (value of the expression bound to
+ *    the element's trigger) and returns `true` if the transition should occur or `false` otherwise
  *
- * ```typescript
- * trigger("myAnimationTrigger", [
- *  // define states
- *  state("on", style({ background: "green" })),
- *  state("off", style({ background: "grey" })),
- *  ...]
- * ```
+ * The string format can be:
+ *  - `fromState => toState`, which indicates that the transition's animations should occur then the
+ *    expression bound to the trigger's element goes from `fromState` to `toState`
  *
- * Note that when you call the `sequence()` function within a `{@link animations/group group()}`
- * or a `transition()` call, execution does not continue to the next instruction
- * until each of the inner animation steps have completed.
+ *    _Example:_
+ *      ```typescript
+ *        transition('open => closed', animate('.5s ease-out', style({ height: 0 }) ))
+ *      ```
  *
- * ### Syntax examples
+ *  - `fromState <=> toState`, which indicates that the transition's animations should occur then
+ *    the expression bound to the trigger's element goes from `fromState` to `toState` or vice versa
  *
- * The following examples define transitions between the two defined states (and default states),
- * using various options:
+ *    _Example:_
+ *      ```typescript
+ *        transition('enabled <=> disabled', animate('1s cubic-bezier(0.8,0.3,0,1)'))
+ *      ```
  *
- * ```typescript
- * // Transition occurs when the state value
- * // bound to "myAnimationTrigger" changes from "on" to "off"
- * transition("on => off", animate(500))
- * // Run the same animation for both directions
- * transition("on <=> off", animate(500))
- * // Define multiple state-change pairs separated by commas
- * transition("on => off, off => void", animate(500))
- * ```
+ *  - `:enter`/`:leave`, which indicates that the transition's animations should occur when the
+ *    element enters or exists the DOM
  *
- * ### Special values for state-change expressions
+ *    _Example:_
+ *      ```typescript
+ *        transition(':enter', [
+ *          style({ opacity: 0 }),
+ *          animate('500ms', style({ opacity: 1 }))
+ *        ])
+ *      ```
  *
- * - Catch-all state change for when an element is inserted into the page and the
- * destination state is unknown:
+ *  - `:increment`/`:decrement`, which indicates that the transition's animations should occur when
+ *    the numerical expression bound to the trigger's element has increased in value or decreased
  *
- * ```typescript
- * transition("void => *", [
- *  style({ opacity: 0 }),
- *  animate(500)
- *  ])
- * ```
+ *    _Example:_
+ *      ```typescript
+ *        transition(':increment', query('@counter', animateChild()))
+ *      ```
  *
- * - Capture a state change between any states:
+ *  - a sequence of any of the above divided by commas, which indicates that transition's animations
+ *    should occur whenever one of the state change expressions matches
  *
- *  `transition("* => *", animate("1s 0s"))`
+ *    _Example:_
+ *      ```typescript
+ *        transition(':increment, * => enabled, :enter', animate('1s ease', keyframes([
+ *          style({ transform: 'scale(1)', offset: 0}),
+ *          style({ transform: 'scale(1.1)', offset: 0.7}),
+ *          style({ transform: 'scale(1)', offset: 1})
+ *        ]))),
+ *      ```
  *
- * - Entry and exit transitions:
+ * Also note that in such context:
+ *  - `void` can be used to indicate the absence of the element
+ *  - asterisks can be used as wildcards that match any state
+ *  - (as a consequence of the above, `void => *` is equivalent to `:enter` and `* => void` is
+ *    equivalent to `:leave`)
+ *  - `true` and `false` also match expression values of `1` and `0` respectively (but do not match
+ *    _truthy_ and _falsy_ values)
  *
- * ```typescript
- * transition(":enter", [
- *   style({ opacity: 0 }),
- *   animate(500, style({ opacity: 1 }))
- *   ]),
- * transition(":leave", [
- *   animate(500, style({ opacity: 0 }))
- *   ])
- * ```
+ * <div class="alert is-helpful">
  *
- * - Use `:increment` and `:decrement` to initiate transitions:
+ *  Be careful about entering end leaving elements as their transitions present a common
+ *  pitfall for developers.
  *
- * ```typescript
- * transition(":increment", group([
- *  query(':enter', [
- *     style({ left: '100%' }),
- *     animate('0.5s ease-out', style('*'))
- *   ]),
- *  query(':leave', [
- *     animate('0.5s ease-out', style({ left: '-100%' }))
- *  ])
- * ]))
+ *  Note that when an element with a trigger enters the DOM its `:enter` transition always
+ *  gets executed, but its `:leave` transition will not be executed if the element is removed
+ *  alongside its parent (as it will be removed "without warning" before its transition has
+ *  a chance to be executed, the only way that such transition can occur is if the element
+ *  is exiting the DOM on its own).
  *
- * transition(":decrement", group([
- *  query(':enter', [
- *     style({ left: '100%' }),
- *     animate('0.5s ease-out', style('*'))
- *   ]),
- *  query(':leave', [
- *     animate('0.5s ease-out', style({ left: '-100%' }))
- *  ])
- * ]))
- * ```
  *
- * ### State-change functions
+ * </div>
  *
- * Here is an example of a `fromState` specified as a state-change function that invokes an
- * animation when true:
- *
- * ```typescript
- * transition((fromState, toState) =>
- *  {
- *   return fromState == "off" && toState == "on";
- *  },
- *  animate("1s 0s"))
- * ```
- *
- * ### Animating to the final state
+ * ### Animating to a Final State
  *
  * If the final step in a transition is a call to `animate()` that uses a timing value
- * with no style data, that step is automatically considered the final animation arc,
- * for the element to reach the final state. Angular automatically adds or removes
+ * with no `style` data, that step is automatically considered the final animation arc,
+ * for the element to reach the final state, in such case Angular automatically adds or removes
  * CSS styles to ensure that the element is in the correct final state.
  *
- * The following example defines a transition that starts by hiding the element,
- * then makes sure that it animates properly to whatever state is currently active for trigger:
  *
- * ```typescript
- * transition("void => *", [
- *   style({ opacity: 0 }),
- *   animate(500)
- *  ])
- * ```
- * ### Boolean value matching
- * If a trigger binding value is a Boolean, it can be matched using a transition expression
- * that compares true and false or 1 and 0. For example:
+ * ### Usage Examples
  *
- * ```
- * // in the template
- * <div [@openClose]="open ? true : false">...</div>
- * // in the component metadata
- * trigger('openClose', [
- *   state('true', style({ height: '*' })),
- *   state('false', style({ height: '0px' })),
- *   transition('false <=> true', animate(500))
- * ])
- * ```
+ *  - Transition animations applied based on
+ *    the trigger's expression value
+ *
+ *   ```HTML
+ *   <div [@myAnimationTrigger]="myStatusExp">
+ *    ...
+ *   </div>
+ *   ```
+ *
+ *   ```typescript
+ *   trigger("myAnimationTrigger", [
+ *     ..., // states
+ *     transition("on => off, open => closed", animate(500)),
+ *     transition("* <=> error", query('.indicator', animateChild()))
+ *   ])
+ *   ```
+ *
+ *  - Transition animations applied based on custom logic dependent
+ *    on the trigger's expression value and provided parameters
+ *
+ *    ```HTML
+ *    <div [@myAnimationTrigger]="{
+ *     value: stepName,
+ *     params: { target: currentTarget }
+ *    }">
+ *     ...
+ *    </div>
+ *    ```
+ *
+ *    ```typescript
+ *    trigger("myAnimationTrigger", [
+ *      ..., // states
+ *      transition(
+ *        (fromState, toState, _element, params) =>
+ *          ['firststep', 'laststep'].includes(fromState.toLowerCase())
+ *          && toState === params?.['target'],
+ *        animate('1s')
+ *      )
+ *    ])
+ *    ```
  *
  * @publicApi
  **/
@@ -10410,7 +10388,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_animations__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/animations */ 1631);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -10748,8 +10726,6 @@ const SUBSTITUTION_EXPR_START = '{{';
 const SUBSTITUTION_EXPR_END = '}}';
 const ENTER_CLASSNAME = 'ng-enter';
 const LEAVE_CLASSNAME = 'ng-leave';
-const ENTER_SELECTOR = '.ng-enter';
-const LEAVE_SELECTOR = '.ng-leave';
 const NG_TRIGGER_CLASSNAME = 'ng-trigger';
 const NG_TRIGGER_SELECTOR = '.ng-trigger';
 const NG_ANIMATING_CLASSNAME = 'ng-animating';
@@ -11855,16 +11831,8 @@ class ElementInstructionMap {
     this._map = new Map();
   }
 
-  consume(element) {
-    let instructions = this._map.get(element);
-
-    if (instructions) {
-      this._map.delete(element);
-    } else {
-      instructions = [];
-    }
-
-    return instructions;
+  get(element) {
+    return this._map.get(element) || [];
   }
 
   append(element, instructions) {
@@ -12020,7 +11988,7 @@ class AnimationTimelineBuilderVisitor {
   }
 
   visitAnimateChild(ast, context) {
-    const elementInstructions = context.subInstructions.consume(context.element);
+    const elementInstructions = context.subInstructions.get(context.element);
 
     if (elementInstructions) {
       const innerContext = context.createSubContext(ast.options);
@@ -14275,7 +14243,15 @@ class TransitionAnimationEngine {
         // required by the user for the animation.
 
 
-        instruction.timelines.forEach(tl => tl.stretchStartingKeyframe = true);
+        const timelines = [];
+        instruction.timelines.forEach(tl => {
+          tl.stretchStartingKeyframe = true;
+
+          if (!this.disabledNodes.has(tl.element)) {
+            timelines.push(tl);
+          }
+        });
+        instruction.timelines = timelines;
         subTimelines.append(element, instruction.timelines);
         const tuple = {
           instruction,
@@ -15960,9 +15936,13 @@ class WebAnimationsPlayer {
     const styles = {};
 
     if (this.hasStarted()) {
-      Object.keys(this._finalKeyframe).forEach(prop => {
+      // note: this code is invoked only when the `play` function was called prior to this
+      // (thus `hasStarted` returns true), this implies that the code that initializes
+      // `_finalKeyframe` has also been executed and the non-null assertion can be safely used here
+      const finalKeyframe = this._finalKeyframe;
+      Object.keys(finalKeyframe).forEach(prop => {
         if (prop != 'offset') {
-          styles[prop] = this._finished ? this._finalKeyframe[prop] : computeStyle(this.element, prop);
+          styles[prop] = this._finished ? finalKeyframe[prop] : computeStyle(this.element, prop);
         }
       });
     }
@@ -76587,7 +76567,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 1640);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 635);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -79969,6 +79949,9 @@ class FormControl extends AbstractControl {
     /** @internal */
 
     this._onChange = [];
+    /** @internal */
+
+    this._pendingChange = false;
 
     this._applyFormState(formState);
 
@@ -85799,7 +85782,7 @@ FormBuilder.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.0');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
