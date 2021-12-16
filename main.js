@@ -682,7 +682,7 @@ NavbarComponent.ɵfac = function NavbarComponent_Factory(t) { return new (t || N
 NavbarComponent.ɵcmp = /*@__PURE__*/ _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineComponent"]({ type: NavbarComponent, selectors: [["app-navbar"]], decls: 13, vars: 3, consts: [["mat-raised-button", "", "routerLink", "/home", "routerLinkActive", "mat-primary"], [1, "spacer"], [3, "matTooltip", "change"], [4, "ngIf"], ["mat-raised-button", "", "routerLink", "/login", "routerLinkActive", "mat-primary"], ["mat-raised-button", "", "routerLink", "/register", "routerLinkActive", "mat-primary"], ["color", "primary", "mat-raised-button", "", 3, "click"]], template: function NavbarComponent_Template(rf, ctx) { if (rf & 1) {
         _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementStart"](0, "mat-toolbar");
         _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementStart"](1, "span");
-        _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵtext"](2, "Wealth MP");
+        _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵtext"](2, "Wealth Management");
         _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementEnd"]();
         _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementStart"](3, "a", 0);
         _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵtext"](4, "Home");
