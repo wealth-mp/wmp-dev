@@ -29450,7 +29450,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -36048,7 +36048,7 @@ function isPlatformWorkerUi(platformId) {
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.0');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -36397,7 +36397,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs/operators */ 116);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs/operators */ 635);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -39559,7 +39559,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 6646);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 1203);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -60610,7 +60610,7 @@ class Version {
 /**
  * @publicApi
  */
-const VERSION = new Version('13.1.0');
+const VERSION = new Version('13.1.1');
 
 /**
  * @license
@@ -101485,7 +101485,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! rxjs/operators */ 1308);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! @angular/common */ 6362);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -108840,7 +108840,7 @@ function provideRouterInitializer() {
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.0');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
