@@ -97864,7 +97864,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_animations_browser__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/animations/browser */ 289);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ 6362);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -98628,7 +98628,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.0
+ * @license Angular v13.1.1
  * (c) 2010-2021 Google LLC. https://angular.io/
  * License: MIT
  */
@@ -101360,7 +101360,7 @@ DomSanitizerImpl.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Version('13.1.0');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Version('13.1.1');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
