@@ -4846,16 +4846,20 @@ class Observable {
     forEach(next, promiseCtor) {
         promiseCtor = getPromiseCtor(promiseCtor);
         return new promiseCtor((resolve, reject) => {
-            let subscription;
-            subscription = this.subscribe((value) => {
-                try {
-                    next(value);
-                }
-                catch (err) {
-                    reject(err);
-                    subscription === null || subscription === void 0 ? void 0 : subscription.unsubscribe();
-                }
-            }, reject, resolve);
+            const subscriber = new _Subscriber__WEBPACK_IMPORTED_MODULE_0__.SafeSubscriber({
+                next: (value) => {
+                    try {
+                        next(value);
+                    }
+                    catch (err) {
+                        reject(err);
+                        subscriber.unsubscribe();
+                    }
+                },
+                error: reject,
+                complete: resolve,
+            });
+            this.subscribe(subscriber);
         });
     }
     _subscribe(subscriber) {
@@ -5842,7 +5846,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "fromAsyncIterable": () => (/* binding */ fromAsyncIterable),
 /* harmony export */   "fromReadableStreamLike": () => (/* binding */ fromReadableStreamLike)
 /* harmony export */ });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! tslib */ 9126);
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! tslib */ 4929);
 /* harmony import */ var _util_isArrayLike__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../util/isArrayLike */ 9806);
 /* harmony import */ var _util_isPromise__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../util/isPromise */ 9548);
 /* harmony import */ var _Observable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Observable */ 833);
@@ -7650,7 +7654,7 @@ class AnimationFrameAction extends _AsyncAction__WEBPACK_IMPORTED_MODULE_0__.Asy
         if ((delay != null && delay > 0) || (delay == null && this.delay > 0)) {
             return super.recycleAsyncId(scheduler, id, delay);
         }
-        if (scheduler.actions.length === 0) {
+        if (!scheduler.actions.some((action) => action.id === id)) {
             _animationFrameProvider__WEBPACK_IMPORTED_MODULE_1__.animationFrameProvider.cancelAnimationFrame(id);
             scheduler._scheduled = undefined;
         }
@@ -7676,20 +7680,19 @@ __webpack_require__.r(__webpack_exports__);
 class AnimationFrameScheduler extends _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__.AsyncScheduler {
     flush(action) {
         this._active = true;
+        const flushId = this._scheduled;
         this._scheduled = undefined;
         const { actions } = this;
         let error;
-        let index = -1;
         action = action || actions.shift();
-        const count = actions.length;
         do {
             if ((error = action.execute(action.state, action.delay))) {
                 break;
             }
-        } while (++index < count && (action = actions.shift()));
+        } while ((action = actions[0]) && action.id === flushId && actions.shift());
         this._active = false;
         if (error) {
-            while (++index < count && (action = actions.shift())) {
+            while ((action = actions[0]) && action.id === flushId && actions.shift()) {
                 action.unsubscribe();
             }
             throw error;
@@ -7731,7 +7734,7 @@ class AsapAction extends _AsyncAction__WEBPACK_IMPORTED_MODULE_0__.AsyncAction {
         if ((delay != null && delay > 0) || (delay == null && this.delay > 0)) {
             return super.recycleAsyncId(scheduler, id, delay);
         }
-        if (scheduler.actions.length === 0) {
+        if (!scheduler.actions.some((action) => action.id === id)) {
             _immediateProvider__WEBPACK_IMPORTED_MODULE_1__.immediateProvider.clearImmediate(id);
             scheduler._scheduled = undefined;
         }
@@ -7757,20 +7760,19 @@ __webpack_require__.r(__webpack_exports__);
 class AsapScheduler extends _AsyncScheduler__WEBPACK_IMPORTED_MODULE_0__.AsyncScheduler {
     flush(action) {
         this._active = true;
+        const flushId = this._scheduled;
         this._scheduled = undefined;
         const { actions } = this;
         let error;
-        let index = -1;
         action = action || actions.shift();
-        const count = actions.length;
         do {
             if ((error = action.execute(action.state, action.delay))) {
                 break;
             }
-        } while (++index < count && (action = actions.shift()));
+        } while ((action = actions[0]) && action.id === flushId && actions.shift());
         this._active = false;
         if (error) {
-            while (++index < count && (action = actions.shift())) {
+            while ((action = actions[0]) && action.id === flushId && actions.shift()) {
                 action.unsubscribe();
             }
             throw error;
@@ -8647,7 +8649,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "readableStreamLikeToAsyncGenerator": () => (/* binding */ readableStreamLikeToAsyncGenerator),
 /* harmony export */   "isReadableStreamLike": () => (/* binding */ isReadableStreamLike)
 /* harmony export */ });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ 9126);
+/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ 4929);
 /* harmony import */ var _isFunction__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./isFunction */ 2971);
 
 
@@ -8848,10 +8850,10 @@ function createInvalidObservableTypeError(input) {
 
 /***/ }),
 
-/***/ 9126:
-/*!***********************************************************!*\
-  !*** ./node_modules/rxjs/node_modules/tslib/tslib.es6.js ***!
-  \***********************************************************/
+/***/ 4929:
+/*!*****************************************!*\
+  !*** ./node_modules/tslib/tslib.es6.js ***!
+  \*****************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -9045,10 +9047,14 @@ function __spreadArrays() {
     return r;
 }
 
-function __spreadArray(to, from) {
-    for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
-        to[j] = from[i];
-    return to;
+function __spreadArray(to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
 }
 
 function __await(v) {
@@ -9104,19 +9110,17 @@ function __importDefault(mod) {
     return (mod && mod.__esModule) ? mod : { default: mod };
 }
 
-function __classPrivateFieldGet(receiver, privateMap) {
-    if (!privateMap.has(receiver)) {
-        throw new TypeError("attempted to get private field on non-instance");
-    }
-    return privateMap.get(receiver);
+function __classPrivateFieldGet(receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
 
-function __classPrivateFieldSet(receiver, privateMap, value) {
-    if (!privateMap.has(receiver)) {
-        throw new TypeError("attempted to set private field on non-instance");
-    }
-    privateMap.set(receiver, value);
-    return value;
+function __classPrivateFieldSet(receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 }
 
 
