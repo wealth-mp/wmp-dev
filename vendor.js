@@ -6256,7 +6256,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function auditTime(duration, scheduler = _scheduler_async__WEBPACK_IMPORTED_MODULE_0__.async) {
+function auditTime(duration, scheduler = _scheduler_async__WEBPACK_IMPORTED_MODULE_0__.asyncScheduler) {
   return (0,_audit__WEBPACK_IMPORTED_MODULE_1__.audit)(() => (0,_observable_timer__WEBPACK_IMPORTED_MODULE_2__.timer)(duration, scheduler));
 }
 
@@ -7020,7 +7020,7 @@ function shareReplay(configOrBufferSize, windowTime, scheduler) {
         connector: () => new _ReplaySubject__WEBPACK_IMPORTED_MODULE_1__.ReplaySubject(bufferSize, windowTime, scheduler),
         resetOnError: true,
         resetOnComplete: false,
-        resetOnRefCountZero: refCount
+        resetOnRefCountZero: refCount,
     });
 }
 
