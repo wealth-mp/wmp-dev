@@ -9,7 +9,7 @@
 
 
 /**
- * gridstack-dd.ts 4.3.1
+ * gridstack-dd.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -18,6 +18,7 @@ exports.GridStackDD = void 0;
 const gridstack_ddi_1 = __webpack_require__(/*! ./gridstack-ddi */ 2725);
 const gridstack_1 = __webpack_require__(/*! ./gridstack */ 6163);
 const utils_1 = __webpack_require__(/*! ./utils */ 5906);
+// TEST let count = 0;
 /**
  * Base class implementing common Grid drag'n'drop functionality, with domain specific subclass (h5 vs jq subclasses)
  */
@@ -39,7 +40,6 @@ exports.GridStackDD = GridStackDD;
 /********************************************************************************
  * GridStack code that is doing drag&drop extracted here so main class is smaller
  * for static grid that don't do any of this work anyway. Saves about 10k.
- * TODO: no code hint in code below as this is <any> so look at alternatives ?
  * https://www.typescriptlang.org/docs/handbook/declaration-merging.html
  * https://www.typescriptlang.org/docs/handbook/mixins.html
  ********************************************************************************/
@@ -51,16 +51,16 @@ gridstack_1.GridStack.prototype._setupAcceptWidget = function () {
         return this;
     }
     // vars shared across all methods
-    let gridPos;
     let cellHeight, cellWidth;
     let onDrag = (event, el, helper) => {
         let node = el.gridstackNode;
         if (!node)
             return;
         helper = helper || el;
-        let rec = helper.getBoundingClientRect();
-        let left = rec.left - gridPos.left;
-        let top = rec.top - gridPos.top;
+        let parent = this.el.getBoundingClientRect();
+        let { top, left } = helper.getBoundingClientRect();
+        left -= parent.left;
+        top -= parent.top;
         let ui = { position: { top, left } };
         if (node._temporaryRemoved) {
             node.x = Math.max(0, Math.round(left / cellWidth));
@@ -93,9 +93,12 @@ gridstack_1.GridStack.prototype._setupAcceptWidget = function () {
         accept: (el) => {
             let node = el.gridstackNode;
             // set accept drop to true on ourself (which we ignore) so we don't get "can't drop" icon in HTML5 mode while moving
-            if (node && node.grid === this)
+            if ((node === null || node === void 0 ? void 0 : node.grid) === this)
                 return true;
             if (!this.opts.acceptWidgets)
+                return false;
+            // prevent deeper nesting until rest of 992 can be fixed
+            if (node === null || node === void 0 ? void 0 : node.subGrid)
                 return false;
             // check for accept method or class matching
             let canAccept = true;
@@ -118,25 +121,24 @@ gridstack_1.GridStack.prototype._setupAcceptWidget = function () {
          * entering our grid area
          */
         .on(this.el, 'dropover', (event, el, helper) => {
+        // TEST console.log(`over ${this.el.gridstack.opts.id} ${count++}`);
         let node = el.gridstackNode;
         // ignore drop enter on ourself (unless we temporarily removed) which happens on a simple drag of our item
-        if (node && node.grid === this && !node._temporaryRemoved) {
+        if ((node === null || node === void 0 ? void 0 : node.grid) === this && !node._temporaryRemoved) {
             // delete node._added; // reset this to track placeholder again in case we were over other grid #1484 (dropout doesn't always clear)
             return false; // prevent parent from receiving msg (which may be a grid as well)
         }
         // fix #1578 when dragging fast, we may not get a leave on the previous grid so force one now
-        if (node && node.grid && node.grid !== this && !node._temporaryRemoved) {
+        if ((node === null || node === void 0 ? void 0 : node.grid) && node.grid !== this && !node._temporaryRemoved) {
             // TEST console.log('dropover without leave');
             let otherGrid = node.grid;
             otherGrid._leave(el, helper);
         }
-        // get grid screen coordinates and cell dimensions
-        let box = this.el.getBoundingClientRect();
-        gridPos = { top: box.top, left: box.left };
+        // cache cell dimensions (which don't change), position can animate if we removed an item in otherGrid that affects us...
         cellWidth = this.cellWidth();
         cellHeight = this.getCellHeight(true);
         // load any element attributes if we don't have a node
-        if (!node) { // @ts-ignore
+        if (!node) { // @ts-ignore private read only on ourself
             node = this._readAttr(el);
         }
         if (!node.grid) {
@@ -177,7 +179,10 @@ gridstack_1.GridStack.prototype._setupAcceptWidget = function () {
          * Leaving our grid area...
          */
         .on(this.el, 'dropout', (event, el, helper) => {
+        // TEST console.log(`out ${this.el.gridstack.opts.id} ${count++}`);
         let node = el.gridstackNode;
+        if (!node)
+            return false;
         // fix #1578 when dragging fast, we might get leave after other grid gets enter (which calls us to clean)
         // so skip this one if we're not the active grid really..
         if (!node.grid || node.grid === this) {
@@ -191,7 +196,7 @@ gridstack_1.GridStack.prototype._setupAcceptWidget = function () {
         .on(this.el, 'drop', (event, el, helper) => {
         let node = el.gridstackNode;
         // ignore drop on ourself from ourself that didn't come from the outside - dragend will handle the simple move instead
-        if (node && node.grid === this && !node._isExternal)
+        if ((node === null || node === void 0 ? void 0 : node.grid) === this && !node._isExternal)
             return false;
         let wasAdded = !!this.placeholder.parentElement; // skip items not actually added to us because of constrains, but do cleanup #1419
         this.placeholder.remove();
@@ -664,7 +669,7 @@ gridstack_1.GridStack.prototype.enableResize = function (doEnable) {
 
 
 /**
- * gridstack-ddi.ts 4.3.1
+ * gridstack-ddi.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -701,8 +706,8 @@ exports.GridStackDDI = GridStackDDI;
 
 
 /**
- * gridstack-engine.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * gridstack-engine.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GridStackEngine = void 0;
@@ -718,10 +723,10 @@ class GridStackEngine {
         this.addedNodes = [];
         this.removedNodes = [];
         this.column = opts.column || 12;
-        this.onChange = opts.onChange;
-        this._float = opts.float;
         this.maxRow = opts.maxRow;
+        this._float = opts.float;
         this.nodes = opts.nodes || [];
+        this.onChange = opts.onChange;
     }
     batchUpdate() {
         if (this.batchMode)
@@ -729,8 +734,7 @@ class GridStackEngine {
         this.batchMode = true;
         this._prevFloat = this._float;
         this._float = true; // let things go anywhere for now... commit() will restore and possibly reposition
-        this.saveInitial(); // since begin update (which is called multiple times) won't do this
-        return this;
+        return this.saveInitial(); // since begin update (which is called multiple times) won't do this
     }
     commit() {
         if (!this.batchMode)
@@ -748,7 +752,7 @@ class GridStackEngine {
     /** @internal fix collision on given 'node', going to given new location 'nn', with optional 'collide' node already found.
      * return true if we moved. */
     _fixCollisions(node, nn = node, collide, opt = {}) {
-        this._sortNodes(-1); // from last to first, so recursive collision move items in the right order
+        this.sortNodes(-1); // from last to first, so recursive collision move items in the right order
         collide = collide || this.collide(node, nn); // REAL area collide for swap and skip if none...
         if (!collide)
             return false;
@@ -922,7 +926,7 @@ class GridStackEngine {
         if (this.nodes.length === 0)
             return this;
         this.batchUpdate()
-            ._sortNodes();
+            .sortNodes();
         let copyNodes = this.nodes;
         this.nodes = []; // pretend we have no nodes to conflict layout to start with...
         copyNodes.forEach(node => {
@@ -945,14 +949,17 @@ class GridStackEngine {
     }
     /** float getter method */
     get float() { return this._float || false; }
-    /** @internal */
-    _sortNodes(dir) {
+    /** sort the nodes array from first to last, or reverse. Called during collision/placement to force an order */
+    sortNodes(dir) {
         this.nodes = utils_1.Utils.sort(this.nodes, dir, this.column);
         return this;
     }
     /** @internal called to top gravity pack the items back OR revert back to original Y positions when floating */
     _packNodes() {
-        this._sortNodes(); // first to last
+        if (this.batchMode) {
+            return this;
+        }
+        this.sortNodes(); // first to last
         if (this.float) {
             // restore original Y pos
             this.nodes.forEach(n => {
@@ -1044,6 +1051,7 @@ class GridStackEngine {
     }
     /** part2 of preparing a node to fit inside our grid - checks  for x,y from grid dimensions */
     nodeBoundFix(node, resizing) {
+        let before = node._orig || utils_1.Utils.copyPos({}, node);
         if (node.maxW) {
             node.w = Math.min(node.w, node.maxW);
         }
@@ -1059,7 +1067,8 @@ class GridStackEngine {
         if (node.w > this.column) {
             // if user loaded a larger than allowed widget for current # of columns,
             // remember it's full width so we can restore back (1 -> 12 column) #1655
-            if (this.column < 12) {
+            // IFF we're not in the middle of column resizing!
+            if (this.column < 12 && !this._inColumnResize) {
                 node.w = Math.min(12, node.w);
                 this.cacheOneLayout(node, 12);
             }
@@ -1096,8 +1105,12 @@ class GridStackEngine {
                 node.y = this.maxRow - node.h;
             }
         }
+        if (!utils_1.Utils.samePos(node, before)) {
+            node._dirty = true;
+        }
         return node;
     }
+    /** returns a list of modified nodes from their original values */
     getDirtyNodes(verify) {
         // compare original x,y,w,h instead as _dirty can be a temporary state
         if (verify) {
@@ -1105,13 +1118,12 @@ class GridStackEngine {
         }
         return this.nodes.filter(n => n._dirty);
     }
-    /** @internal call this to call onChange CB with dirty nodes */
-    _notify(nodes, removeDOM = true) {
-        if (this.batchMode)
+    /** @internal call this to call onChange callback with dirty nodes so DOM can be updated */
+    _notify(removedNodes) {
+        if (this.batchMode || !this.onChange)
             return this;
-        nodes = (nodes === undefined ? [] : (Array.isArray(nodes) ? nodes : [nodes]));
-        let dirtyNodes = nodes.concat(this.getDirtyNodes());
-        this.onChange && this.onChange(dirtyNodes, removeDOM);
+        let dirtyNodes = (removedNodes || []).concat(this.getDirtyNodes());
+        this.onChange(dirtyNodes);
         return this;
     }
     /** @internal remove dirty and last tried info */
@@ -1148,14 +1160,15 @@ class GridStackEngine {
     }
     /** call to add the given node to our list, fixing collision and re-packing */
     addNode(node, triggerAddEvent = false) {
-        let dup;
-        if (dup = this.nodes.find(n => n._id === node._id))
+        let dup = this.nodes.find(n => n._id === node._id);
+        if (dup)
             return dup; // prevent inserting twice! return it instead.
-        node = this.prepareNode(node);
+        // skip prepareNode if we're in middle of column resize (not new) but do check for bounds!
+        node = this._inColumnResize ? this.nodeBoundFix(node) : this.prepareNode(node);
         delete node._temporaryRemoved;
         delete node._removeDOM;
         if (node.autoPosition) {
-            this._sortNodes();
+            this.sortNodes();
             for (let i = 0;; ++i) {
                 let x = i % this.column;
                 let y = Math.floor(i / this.column);
@@ -1172,10 +1185,13 @@ class GridStackEngine {
             }
         }
         this.nodes.push(node);
-        triggerAddEvent && this.addedNodes.push(node);
+        if (triggerAddEvent) {
+            this.addedNodes.push(node);
+        }
         this._fixCollisions(node);
-        this._packNodes()
-            ._notify();
+        if (!this.batchMode) {
+            this._packNodes()._notify();
+        }
         return node;
     }
     removeNode(node, removeDOM = true, triggerEvent = false) {
@@ -1191,7 +1207,7 @@ class GridStackEngine {
         // don't use 'faster' .splice(findIndex(),1) in case node isn't in our list, or in multiple times.
         this.nodes = this.nodes.filter(n => n !== node);
         return this._packNodes()
-            ._notify(node);
+            ._notify([node]);
     }
     removeAll(removeDOM = true) {
         delete this._layouts;
@@ -1211,7 +1227,7 @@ class GridStackEngine {
             return false;
         o.pack = true;
         // simpler case: move item directly...
-        if (!this.maxRow /* && !this._hasLocked*/) {
+        if (!this.maxRow) {
             return this.moveNode(node, o);
         }
         // complex case: create a clone with NO maxRow (will check for out of bounds at the end)
@@ -1229,17 +1245,14 @@ class GridStackEngine {
         });
         if (!clonedNode)
             return false;
-        let canMove = clone.moveNode(clonedNode, o);
-        // if maxRow make sure we are still valid size
-        if (this.maxRow && canMove) {
-            canMove = (clone.getRow() <= this.maxRow);
-            // turns out we can't grow, then see if we can swap instead (ex: full grid) if we're not resizing
-            if (!canMove && !o.resizing) {
-                let collide = this.collide(node, o);
-                if (collide && this.swap(node, collide)) {
-                    this._notify();
-                    return true;
-                }
+        // make sure we are still valid size
+        let canMove = clone.moveNode(clonedNode, o) && clone.getRow() <= this.maxRow;
+        // turns out we can't grow, then see if we can swap instead (ex: full grid) if we're not resizing
+        if (!canMove && !o.resizing) {
+            let collide = this.collide(node, o);
+            if (collide && this.swap(node, collide)) {
+                this._notify();
+                return true;
             }
         }
         if (!canMove)
@@ -1282,7 +1295,7 @@ class GridStackEngine {
     }
     /** true if x,y or w,h are different after clamping to min/max */
     changedPosConstrain(node, p) {
-        // make sure w,h are set
+        // first make sure w,h are set for caller
         p.w = p.w || node.w;
         p.h = p.h || node.h;
         if (node.x !== p.x || node.y !== p.y)
@@ -1329,13 +1342,8 @@ class GridStackEngine {
         if (utils_1.Utils.samePos(node, o))
             return false;
         let prevPos = utils_1.Utils.copyPos({}, node);
-        // during while() collisions make sure to check entire row so larger items don't leap frog small ones (push them all down)
-        let area = nn;
-        // if (this._useEntireRowArea(node, nn)) {
-        //   area = {x: 0, w: this.column, y: nn.y, h: nn.h};
-        // }
         // check if we will need to fix collision at our new location
-        let collides = this.collideAll(node, area, o.skip);
+        let collides = this.collideAll(node, nn, o.skip);
         let needToMove = true;
         if (collides.length) {
             // now check to make sure we actually collided over 50% surface area while dragging
@@ -1386,7 +1394,7 @@ class GridStackEngine {
         let len = (_a = this._layouts) === null || _a === void 0 ? void 0 : _a.length;
         let layout = len && this.column !== (len - 1) ? this._layouts[len - 1] : null;
         let list = [];
-        this._sortNodes();
+        this.sortNodes();
         this.nodes.forEach(n => {
             let wl = layout === null || layout === void 0 ? void 0 : layout.find(l => l._id === n._id);
             let w = Object.assign({}, n);
@@ -1419,7 +1427,7 @@ class GridStackEngine {
     }
     /** @internal called whenever a node is added or moved - updates the cached layouts */
     layoutsNodesChange(nodes) {
-        if (!this._layouts || this._ignoreLayoutsNodeChange)
+        if (!this._layouts || this._inColumnResize)
             return this;
         // remove smaller layouts - we will re-generate those on the fly... larger ones need to update
         this._layouts.forEach((layout, column) => {
@@ -1430,14 +1438,14 @@ class GridStackEngine {
             }
             else {
                 // we save the original x,y,w (h isn't cached) to see what actually changed to propagate better.
-                // Note: we don't need to check against out of bound scaling/moving as that will be done when using those cache values.
+                // NOTE: we don't need to check against out of bound scaling/moving as that will be done when using those cache values. #1785
+                let ratio = column / this.column;
                 nodes.forEach(node => {
                     if (!node._orig)
                         return; // didn't change (newly added ?)
                     let n = layout.find(l => l._id === node._id);
                     if (!n)
                         return; // no cache for new nodes. Will use those values.
-                    let ratio = column / this.column;
                     // Y changed, push down same amount
                     // TODO: detect doing item 'swaps' will help instead of move (especially in 1 column mode)
                     if (node.y !== node._orig.y) {
@@ -1462,19 +1470,24 @@ class GridStackEngine {
      * Note we store previous layouts (especially original ones) to make it possible to go
      * from say 12 -> 1 -> 12 and get back to where we were.
      *
-     * @param oldColumn previous number of columns
+     * @param prevColumn previous number of columns
      * @param column  new column number
      * @param nodes different sorted list (ex: DOM order) instead of current list
      * @param layout specify the type of re-layout that will happen (position, size, etc...).
      * Note: items will never be outside of the current column boundaries. default (moveScale). Ignored for 1 column
      */
-    updateNodeWidths(oldColumn, column, nodes, layout = 'moveScale') {
-        if (!this.nodes.length || oldColumn === column)
+    updateNodeWidths(prevColumn, column, nodes, layout = 'moveScale') {
+        var _a;
+        if (!this.nodes.length || !column || prevColumn === column)
             return this;
         // cache the current layout in case they want to go back (like 12 -> 1 -> 12) as it requires original data
-        this.cacheLayout(this.nodes, oldColumn);
+        this.cacheLayout(this.nodes, prevColumn);
+        this.batchUpdate(); // do this EARLY as it will call saveInitial() so we can detect where we started for _dirty and collision
+        let newNodes = [];
         // if we're going to 1 column and using DOM order rather than default sorting, then generate that layout
-        if (column === 1 && nodes && nodes.length) {
+        let domOrder = false;
+        if (column === 1 && (nodes === null || nodes === void 0 ? void 0 : nodes.length)) {
+            domOrder = true;
             let top = 0;
             nodes.forEach(n => {
                 n.x = 0;
@@ -1482,33 +1495,34 @@ class GridStackEngine {
                 n.y = Math.max(n.y, top);
                 top = n.y + n.h;
             });
+            newNodes = nodes;
+            nodes = [];
         }
         else {
-            nodes = utils_1.Utils.sort(this.nodes, -1, oldColumn); // current column reverse sorting so we can insert last to front (limit collision)
+            nodes = utils_1.Utils.sort(this.nodes, -1, prevColumn); // current column reverse sorting so we can insert last to front (limit collision)
         }
-        // see if we have cached previous layout.
-        let cacheNodes = this._layouts[column] || [];
-        // if not AND we are going up in size start with the largest layout as down-scaling is more accurate
-        let lastIndex = this._layouts.length - 1;
-        if (cacheNodes.length === 0 && column > oldColumn && column < lastIndex) {
-            cacheNodes = this._layouts[lastIndex] || [];
-            if (cacheNodes.length) {
-                // pretend we came from that larger column by assigning those values as starting point
-                oldColumn = lastIndex;
-                cacheNodes.forEach(cacheNode => {
-                    let j = nodes.findIndex(n => n._id === cacheNode._id);
-                    if (j !== -1) {
+        // see if we have cached previous layout IFF we are going up in size (restore) otherwise always
+        // generate next size down from where we are (looks more natural as you gradually size down).
+        let cacheNodes = [];
+        if (column > prevColumn) {
+            cacheNodes = this._layouts[column] || [];
+            // ...if not, start with the largest layout (if not already there) as down-scaling is more accurate
+            // by pretending we came from that larger column by assigning those values as starting point
+            let lastIndex = this._layouts.length - 1;
+            if (!cacheNodes.length && prevColumn !== lastIndex && ((_a = this._layouts[lastIndex]) === null || _a === void 0 ? void 0 : _a.length)) {
+                prevColumn = lastIndex;
+                this._layouts[lastIndex].forEach(cacheNode => {
+                    let n = nodes.find(n => n._id === cacheNode._id);
+                    if (n) {
                         // still current, use cache info positions
-                        nodes[j].x = cacheNode.x;
-                        nodes[j].y = cacheNode.y;
-                        nodes[j].w = cacheNode.w;
+                        n.x = cacheNode.x;
+                        n.y = cacheNode.y;
+                        n.w = cacheNode.w;
                     }
                 });
-                cacheNodes = []; // we still don't have new column cached data... will generate from larger one.
             }
         }
         // if we found cache re-use those nodes that are still current
-        let newNodes = [];
         cacheNodes.forEach(cacheNode => {
             let j = nodes.findIndex(n => n._id === cacheNode._id);
             if (j !== -1) {
@@ -1523,15 +1537,16 @@ class GridStackEngine {
         // ...and add any extra non-cached ones
         if (nodes.length) {
             if (typeof layout === 'function') {
-                layout(column, oldColumn, newNodes, nodes);
+                layout(column, prevColumn, newNodes, nodes);
             }
-            else {
-                let ratio = column / oldColumn;
+            else if (!domOrder) {
+                let ratio = column / prevColumn;
                 let move = (layout === 'move' || layout === 'moveScale');
                 let scale = (layout === 'scale' || layout === 'moveScale');
                 nodes.forEach(node => {
+                    // NOTE: x + w could be outside of the grid, but addNode() below will handle that
                     node.x = (column === 1 ? 0 : (move ? Math.round(node.x * ratio) : Math.min(node.x, column - 1)));
-                    node.w = ((column === 1 || oldColumn === 1) ? 1 :
+                    node.w = ((column === 1 || prevColumn === 1) ? 1 :
                         scale ? (Math.round(node.w * ratio) || 1) : (Math.min(node.w, column)));
                     newNodes.push(node);
                 });
@@ -1540,15 +1555,14 @@ class GridStackEngine {
         }
         // finally re-layout them in reverse order (to get correct placement)
         newNodes = utils_1.Utils.sort(newNodes, -1, column);
-        this._ignoreLayoutsNodeChange = true;
-        this.batchUpdate();
-        this.nodes = []; // pretend we have no nodes to start with (we use same structures) to simplify layout
+        this._inColumnResize = true; // prevent cache update
+        this.nodes = []; // pretend we have no nodes to start with (add() will use same structures) to simplify layout
         newNodes.forEach(node => {
             this.addNode(node, false); // 'false' for add event trigger
-            node._dirty = true; // force attr update
-        }, this);
+            delete node._orig; // make sure the commit doesn't try to restore things back to original
+        });
         this.commit();
-        delete this._ignoreLayoutsNodeChange;
+        delete this._inColumnResize;
         return this;
     }
     /**
@@ -1604,13 +1618,6 @@ GridStackEngine._idSeq = 1;
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
-/*!
- * GridStack 4.3.1
- * https://gridstackjs.com/
- *
- * Copyright (c) 2021 Alain Dumesny
- * see root license https://github.com/gridstack/gridstack.js/tree/master/LICENSE
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
@@ -1623,6 +1630,13 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GridStack = void 0;
+/*!
+ * GridStack 5.1.1
+ * https://gridstackjs.com/
+ *
+ * Copyright (c) 2021-2022 Alain Dumesny
+ * see root license https://github.com/gridstack/gridstack.js/tree/master/LICENSE
+ */
 const gridstack_engine_1 = __webpack_require__(/*! ./gridstack-engine */ 697);
 const utils_1 = __webpack_require__(/*! ./utils */ 5906);
 const gridstack_ddi_1 = __webpack_require__(/*! ./gridstack-ddi */ 2725);
@@ -1646,7 +1660,7 @@ const GridDefaults = {
     cellHeightThrottle: 100,
     margin: 10,
     auto: true,
-    minWidth: 768,
+    oneColumnSize: 768,
     float: false,
     staticGrid: false,
     animate: true,
@@ -1701,6 +1715,17 @@ class GridStack {
             delete opts.row;
         }
         let rowAttr = utils_1.Utils.toNumber(el.getAttribute('gs-row'));
+        // flag only valid in sub-grids (handled by parent, not here)
+        if (opts.column === 'auto') {
+            delete opts.column;
+        }
+        // 'minWidth' legacy support in 5.1
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        let anyOpts = opts;
+        if (anyOpts.minWidth !== undefined) {
+            opts.oneColumnSize = opts.oneColumnSize || anyOpts.minWidth;
+            delete anyOpts.minWidth;
+        }
         // elements attributes override any passed options (like CSS style) - merge the two together
         let defaults = Object.assign(Object.assign({}, utils_1.Utils.cloneDeep(GridDefaults)), { column: utils_1.Utils.toNumber(el.getAttribute('gs-column')) || 12, minRow: rowAttr ? rowAttr : utils_1.Utils.toNumber(el.getAttribute('gs-min-row')) || 0, maxRow: rowAttr ? rowAttr : utils_1.Utils.toNumber(el.getAttribute('gs-max-row')) || 0, staticGrid: utils_1.Utils.toBool(el.getAttribute('gs-static')) || false, _styleSheetClass: 'grid-stack-instance-' + (Math.random() * 10000).toFixed(0), alwaysShowResizeHandle: opts.alwaysShowResizeHandle || false, resizable: {
                 autoHide: !(opts.alwaysShowResizeHandle || false),
@@ -1717,10 +1742,10 @@ class GridStack {
         }
         this.opts = utils_1.Utils.defaults(opts, defaults);
         opts = null; // make sure we use this.opts instead
-        this.initMargin(); // part of settings defaults...
+        this._initMargin(); // part of settings defaults...
         // Now check if we're loading into 1 column mode FIRST so we don't do un-necessary work (like cellHeight = width / 12 then go 1 column)
-        if (this.opts.column !== 1 && !this.opts.disableOneColumnMode && this._widthOrContainer() <= this.opts.minWidth) {
-            this._prevColumn = this.opts.column;
+        if (this.opts.column !== 1 && !this.opts.disableOneColumnMode && this._widthOrContainer() <= this.opts.oneColumnSize) {
+            this._prevColumn = this.getColumn();
             this.opts.column = 1;
         }
         if (this.opts.rtl === 'auto') {
@@ -1734,6 +1759,7 @@ class GridStack {
         if (parentGridItemEl && parentGridItemEl.gridstackNode) {
             this.opts._isNested = parentGridItemEl.gridstackNode;
             this.opts._isNested.subGrid = this;
+            parentGridItemEl.classList.add('grid-stack-nested');
             this.el.classList.add('grid-stack-nested');
         }
         this._isAutoCellHeight = (this.opts.cellHeight === 'auto');
@@ -1751,8 +1777,9 @@ class GridStack {
         }
         this.el.classList.add(this.opts._styleSheetClass);
         this._setStaticClass();
-        this.engine = new gridstack_engine_1.GridStackEngine({
-            column: this.opts.column,
+        let engineClass = this.opts.engineClass || GridStack.engineClass || gridstack_engine_1.GridStackEngine;
+        this.engine = new engineClass({
+            column: this.getColumn(),
             float: this.opts.float,
             maxRow: this.opts.maxRow,
             onChange: (cbNodes) => {
@@ -1760,6 +1787,8 @@ class GridStack {
                 this.engine.nodes.forEach(n => { maxH = Math.max(maxH, n.y + n.h); });
                 cbNodes.forEach(n => {
                     let el = n.el;
+                    if (!el)
+                        return;
                     if (n._removeDOM) {
                         if (el)
                             el.remove();
@@ -1781,7 +1810,7 @@ class GridStack {
                 elements.push({
                     el,
                     // if x,y are missing (autoPosition) add them to end of list - but keep their respective DOM order
-                    i: (Number.isNaN(x) ? 1000 : x) + (Number.isNaN(y) ? 1000 : y) * this.opts.column
+                    i: (Number.isNaN(x) ? 1000 : x) + (Number.isNaN(y) ? 1000 : y) * this.getColumn()
                 });
             });
             elements.sort((a, b) => a.i - b.i).forEach(e => this._prepareElement(e.el));
@@ -1869,7 +1898,7 @@ class GridStack {
         // create the grid element, but check if the passed 'parent' already has grid styling and should be used instead
         let el = parent;
         if (!parent.classList.contains('grid-stack')) {
-            let doc = document.implementation.createHTMLDocument();
+            let doc = document.implementation.createHTMLDocument(''); // IE needs a param
             doc.body.innerHTML = `<div class="grid-stack ${opt.class || ''}"></div>`;
             el = doc.body.children[0];
             parent.appendChild(el);
@@ -1882,6 +1911,13 @@ class GridStack {
             grid.load(children);
         }
         return grid;
+    }
+    /** call this method to register your engine instead of the default one.
+     * See instead `GridStackOptions.engineClass` if you only need to
+     * replace just one instance.
+     */
+    static registerEngine(engineClass) {
+        GridStack.engineClass = engineClass;
     }
     /** @internal create placeholder DIV as needed */
     get placeholder() {
@@ -1926,14 +1962,14 @@ class GridStack {
         }
         let el;
         if (typeof els === 'string') {
-            let doc = document.implementation.createHTMLDocument();
+            let doc = document.implementation.createHTMLDocument(''); // IE needs a param
             doc.body.innerHTML = els;
             el = doc.body.children[0];
         }
         else if (arguments.length === 0 || arguments.length === 1 && isGridStackWidget(els)) {
             let content = els ? els.content || '' : '';
             options = els;
-            let doc = document.implementation.createHTMLDocument();
+            let doc = document.implementation.createHTMLDocument(''); // IE needs a param
             doc.body.innerHTML = `<div class="grid-stack-item ${this.opts.itemClass || ''}"><div class="grid-stack-item-content">${content}</div></div>`;
             el = doc.body.children[0];
         }
@@ -1959,8 +1995,19 @@ class GridStack {
         this._updateContainerHeight();
         // check if nested grid definition is present
         if (node.subGrid && !node.subGrid.el) { // see if there is a sub-grid to create too
+            // if column special case it set, remember that flag and set default
+            let autoColumn;
+            let ops = node.subGrid;
+            if (ops.column === 'auto') {
+                ops.column = node.w;
+                ops.disableOneColumnMode = true; // driven by parent
+                autoColumn = true;
+            }
             let content = node.el.querySelector('.grid-stack-item-content');
             node.subGrid = GridStack.addGrid(content, node.subGrid);
+            if (autoColumn) {
+                node.subGrid._autoColumn = true;
+            }
         }
         this._triggerAddEvent();
         this._triggerChangeEvent();
@@ -2014,6 +2061,10 @@ class GridStack {
             if (this._isAutoCellHeight) {
                 o.cellHeight = 'auto';
             }
+            if (this._autoColumn) {
+                o.column = 'auto';
+                delete o.disableOneColumnMode;
+            }
             utils_1.Utils.removeInternalAndSame(o, GridDefaults);
             o.children = list;
             return o;
@@ -2031,7 +2082,7 @@ class GridStack {
      * see http://gridstackjs.com/demo/serialization.html
      **/
     load(layout, addAndRemove = true) {
-        let items = GridStack.Utils.sort([...layout], -1, this._prevColumn || this.opts.column); // make copy before we mod/sort
+        let items = GridStack.Utils.sort([...layout], -1, this._prevColumn || this.getColumn()); // make copy before we mod/sort
         this._insertNotAppend = true; // since create in reverse order...
         // if we're loading a layout into 1 column (_prevColumn is set only when going to 1) and items don't fit, make sure to save
         // the original wanted layout so we can scale back up correctly #1471
@@ -2101,12 +2152,15 @@ class GridStack {
             (!forcePixel || !this.opts.cellHeightUnit || this.opts.cellHeightUnit === 'px')) {
             return this.opts.cellHeight;
         }
-        // else do entire grid and # of rows
-        // or get first cell height ?
-        // let el = this.el.querySelector('.' + this.opts.itemClass) as HTMLElement;
-        // let height = Utils.toNumber(el.getAttribute('gs-h'));
-        // return Math.round(el.offsetHeight / height);
-        return Math.round(this.el.getBoundingClientRect().height) / parseInt(this.el.getAttribute('gs-current-row'));
+        // else get first cell height
+        let el = this.el.querySelector('.' + this.opts.itemClass);
+        if (el) {
+            let height = utils_1.Utils.toNumber(el.getAttribute('gs-h'));
+            return Math.round(el.offsetHeight / height);
+        }
+        // else do entire grid and # of rows (but doesn't work if min-height is the actual constrain)
+        let rows = parseInt(this.el.getAttribute('gs-current-row'));
+        return rows ? Math.round(this.el.getBoundingClientRect().height / rows) : this.opts.cellHeight;
     }
     /**
      * Update current cell height - see `GridStackOptions.cellHeight` for format.
@@ -2152,7 +2206,7 @@ class GridStack {
     }
     /** Gets current cell width. */
     cellWidth() {
-        return this._widthOrContainer() / this.opts.column;
+        return this._widthOrContainer() / this.getColumn();
     }
     /** return our expected width (or parent) for 1 column check */
     _widthOrContainer() {
@@ -2186,9 +2240,9 @@ class GridStack {
      * Note: items will never be outside of the current column boundaries. default (moveScale). Ignored for 1 column
      */
     column(column, layout = 'moveScale') {
-        if (this.opts.column === column)
+        if (column < 1 || this.opts.column === column)
             return this;
-        let oldColumn = this.opts.column;
+        let oldColumn = this.getColumn();
         // if we go into 1 column mode (which happens if we're sized less than minW unless disableOneColumnMode is on)
         // then remember the original columns so we can restore.
         if (column === 1) {
@@ -2297,7 +2351,7 @@ class GridStack {
         }
         let relativeLeft = position.left - containerPos.left;
         let relativeTop = position.top - containerPos.top;
-        let columnWidth = (box.width / this.opts.column);
+        let columnWidth = (box.width / this.getColumn());
         let rowHeight = (box.height / parseInt(this.el.getAttribute('gs-current-row')));
         return { x: Math.floor(relativeLeft / columnWidth), y: Math.floor(relativeTop / rowHeight) };
     }
@@ -2558,7 +2612,7 @@ class GridStack {
         // re-use existing margin handling
         this.opts.margin = value;
         this.opts.marginTop = this.opts.marginBottom = this.opts.marginLeft = this.opts.marginRight = undefined;
-        this.initMargin();
+        this._initMargin();
         this._updateStyles(true); // true = force re-create
         return this;
     }
@@ -2703,13 +2757,15 @@ class GridStack {
             return this;
         let row = this.getRow() + this._extraDragRow; // checks for minRow already
         // check for css min height
-        let cssMinHeight = parseInt(getComputedStyle(this.el)['min-height']);
-        if (cssMinHeight > 0) {
-            let minRow = Math.round(cssMinHeight / this.getCellHeight(true));
-            if (row < minRow) {
-                row = minRow;
-            }
-        }
+        // Note: we don't handle %,rem correctly so comment out, beside we don't need need to create un-necessary
+        // rows as the CSS will make us bigger than our set height if needed... not sure why we had this.
+        // let cssMinHeight = parseInt(getComputedStyle(this.el)['min-height']);
+        // if (cssMinHeight > 0) {
+        //   let minRow = Math.round(cssMinHeight / this.getCellHeight(true));
+        //   if (row < minRow) {
+        //     row = minRow;
+        //   }
+        // }
         this.el.setAttribute('gs-current-row', String(row));
         if (row === 0) {
             this.el.style.removeProperty('height');
@@ -2825,33 +2881,43 @@ class GridStack {
     }
     /**
      * called when we are being resized by the window - check if the one Column Mode needs to be turned on/off
-     * and remember the prev columns we used, as well as check for auto cell height (square)
+     * and remember the prev columns we used, or get our count from parent, as well as check for auto cell height (square)
      */
     onParentResize() {
         if (!this.el || !this.el.clientWidth)
             return; // return if we're gone or no size yet (will get called again)
-        let oneColumn = !this.opts.disableOneColumnMode && this.el.clientWidth <= this.opts.minWidth;
-        let changedOneColumn = false;
-        if ((this.opts.column === 1) !== oneColumn) {
-            changedOneColumn = true;
-            if (this.opts.animate) {
-                this.setAnimation(false);
-            } // 1 <-> 12 is too radical, turn off animation
-            this.column(oneColumn ? 1 : this._prevColumn);
-            if (this.opts.animate) {
-                this.setAnimation(true);
+        let changedColumn = false;
+        // see if we're nested and take our column count from our parent....
+        if (this._autoColumn && this.opts._isNested) {
+            if (this.opts.column !== this.opts._isNested.w) {
+                changedColumn = true;
+                this.column(this.opts._isNested.w, 'none');
+            }
+        }
+        else {
+            // else check for 1 column in/out behavior
+            let oneColumn = !this.opts.disableOneColumnMode && this.el.clientWidth <= this.opts.oneColumnSize;
+            if ((this.opts.column === 1) !== oneColumn) {
+                changedColumn = true;
+                if (this.opts.animate) {
+                    this.setAnimation(false);
+                } // 1 <-> 12 is too radical, turn off animation
+                this.column(oneColumn ? 1 : this._prevColumn);
+                if (this.opts.animate) {
+                    this.setAnimation(true);
+                }
             }
         }
         // make the cells content square again
         if (this._isAutoCellHeight) {
-            if (!changedOneColumn && this.opts.cellHeightThrottle) {
+            if (!changedColumn && this.opts.cellHeightThrottle) {
                 if (!this._cellHeightThrottle) {
                     this._cellHeightThrottle = utils_1.Utils.throttle(() => this.cellHeight(), this.opts.cellHeightThrottle);
                 }
                 this._cellHeightThrottle();
             }
             else {
-                // immediate update if we've changed to/from oneColumn or have no threshold
+                // immediate update if we've changed column count or have no threshold
                 this.cellHeight();
             }
         }
@@ -2886,7 +2952,7 @@ class GridStack {
     /** @internal */
     static getGridElements(els) { return utils_1.Utils.getElements(els); }
     /** @internal initialize margin top/bottom/left/right and units */
-    initMargin() {
+    _initMargin() {
         let data;
         let margin = 0;
         // support passing multiple values like CSS (ex: '5px 10px 0 20px')
@@ -3034,8 +3100,8 @@ GridStack.Engine = gridstack_engine_1.GridStackEngine;
 
 
 /**
- * dd-base-impl.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * dd-base-impl.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDBaseImplement = void 0;
@@ -3081,8 +3147,8 @@ exports.DDBaseImplement = DDBaseImplement;
 
 
 /**
- * dd-draggable.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * dd-draggable.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDDraggable = void 0;
@@ -3254,28 +3320,37 @@ class DDDraggable extends dd_base_impl_1.DDBaseImplement {
     }
     /** @internal */
     _setupHelperStyle() {
-        this.helper.style.pointerEvents = 'none';
-        this.helper.style.width = this.dragOffset.width + 'px';
-        this.helper.style.height = this.dragOffset.height + 'px';
-        this.helper.style.willChange = 'left, top';
-        this.helper.style.transition = 'none'; // show up instantly
-        this.helper.style.position = this.option.basePosition || DDDraggable.basePosition;
-        this.helper.style.zIndex = '1000';
+        // TODO: set all at once with style.cssText += ... ? https://stackoverflow.com/questions/3968593
+        const rec = this.helper.getBoundingClientRect();
+        const style = this.helper.style;
+        style.pointerEvents = 'none';
+        style['min-width'] = 0; // since we no longer relative to our parent and we don't resize anyway (normally 100/#column %)
+        style.width = this.dragOffset.width + 'px';
+        style.height = this.dragOffset.height + 'px';
+        style.willChange = 'left, top';
+        style.position = 'fixed'; // let us drag between grids by not clipping as parent .grid-stack is position: 'relative'
+        style.left = rec.left + 'px';
+        style.top = rec.top + 'px';
+        style.transition = 'none'; // show up instantly
         setTimeout(() => {
             if (this.helper) {
-                this.helper.style.transition = null; // recover animation
+                style.transition = null; // recover animation
             }
         }, 0);
         return this;
     }
     /** @internal */
     _removeHelperStyle() {
+        var _a;
+        let node = (_a = this.helper) === null || _a === void 0 ? void 0 : _a.gridstackNode;
         // don't bother restoring styles if we're gonna remove anyway...
-        let node = this.helper ? this.helper.gridstackNode : undefined;
-        if (!node || !node._isAboutToRemove) {
-            DDDraggable.originStyleProp.forEach(prop => {
-                this.helper.style[prop] = this.dragElementOriginStyle[prop] || null;
-            });
+        if (this.dragElementOriginStyle && (!node || !node._isAboutToRemove)) {
+            let helper = this.helper;
+            // don't animate, otherwise we animate offseted when switching back to 'absolute' from 'fixed' 
+            let transition = this.dragElementOriginStyle['transition'] || null;
+            helper.style.transition = this.dragElementOriginStyle['transition'] = 'none';
+            DDDraggable.originStyleProp.forEach(prop => helper.style[prop] = this.dragElementOriginStyle[prop] || null);
+            setTimeout(() => helper.style.transition = transition, 50); // recover animation from saved vars after a pause (0 isn't enough #1973)
         }
         delete this.dragElementOriginStyle;
         return this;
@@ -3300,7 +3375,7 @@ class DDDraggable extends dd_base_impl_1.DDBaseImplement {
     /** @internal */
     _setupHelperContainmentStyle() {
         this.helperContainment = this.helper.parentElement;
-        if (this.option.basePosition !== 'fixed') {
+        if (this.helper.style.position !== 'fixed') {
             this.parentOriginStylePosition = this.helperContainment.style.position;
             if (window.getComputedStyle(this.helperContainment).position.match(/static/)) {
                 this.helperContainment.style.position = 'relative';
@@ -3308,10 +3383,10 @@ class DDDraggable extends dd_base_impl_1.DDBaseImplement {
         }
         return this;
     }
-    /** @internal prevent the default gost image to be created (which has wrongas we move the helper/element instead
+    /** @internal prevent the default ghost image to be created (which has wrong as we move the helper/element instead
      * (legacy jquery UI code updates the top/left of the item).
      * TODO: maybe use mouse event instead of HTML5 drag as we have to work around it anyway, or change code to not update
-     * the actual grid-item but move the gost image around (and special case jq version) ?
+     * the actual grid-item but move the ghost image around (and special case jq version) ?
      **/
     _cancelDragGhost(e) {
         /* doesn't seem to do anything...
@@ -3366,13 +3441,11 @@ class DDDraggable extends dd_base_impl_1.DDBaseImplement {
     }
 }
 exports.DDDraggable = DDDraggable;
-/** @internal */
-DDDraggable.basePosition = 'absolute';
 /** @internal #1541 can't have {passive: true} on Safari as otherwise it reverts animate back to old location on drop */
 DDDraggable.dragEventListenerOption = true; // DDUtils.isEventSupportPassiveOption ? { capture: true, passive: true } : true;
-/** @internal */
+/** @internal properties we change during dragging, and restore back */
 DDDraggable.originStyleProp = ['transition', 'pointerEvents', 'position',
-    'left', 'top', 'opacity', 'zIndex', 'width', 'height', 'willChange'];
+    'left', 'top', 'opacity', 'zIndex', 'width', 'height', 'willChange', 'min-width'];
 
 
 /***/ }),
@@ -3385,14 +3458,15 @@ DDDraggable.originStyleProp = ['transition', 'pointerEvents', 'position',
 
 
 /**
- * dd-droppable.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * dd-droppable.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDDroppable = void 0;
 const dd_manager_1 = __webpack_require__(/*! ./dd-manager */ 5310);
 const dd_base_impl_1 = __webpack_require__(/*! ./dd-base-impl */ 6352);
 const dd_utils_1 = __webpack_require__(/*! ./dd-utils */ 7868);
+// TEST let count = 0;
 class DDDroppable extends dd_base_impl_1.DDBaseImplement {
     constructor(el, opts = {}) {
         super();
@@ -3429,13 +3503,10 @@ class DDDroppable extends dd_base_impl_1.DDBaseImplement {
         this.el.removeEventListener('dragenter', this._dragEnter);
     }
     destroy() {
-        if (this.moving) {
-            this._removeLeaveCallbacks();
-        }
+        this._removeLeaveCallbacks();
         this.disable(true);
         this.el.classList.remove('ui-droppable');
         this.el.classList.remove('ui-droppable-disabled');
-        delete this.moving;
         super.destroy();
     }
     updateOption(opts) {
@@ -3445,11 +3516,14 @@ class DDDroppable extends dd_base_impl_1.DDBaseImplement {
     }
     /** @internal called when the cursor enters our area - prepare for a possible drop and track leaving */
     _dragEnter(event) {
+        // TEST console.log(`${count++} Enter ${(this.el as GridHTMLElement).gridstack.opts.id}`);
         if (!this._canDrop())
             return;
         event.preventDefault();
+        event.stopPropagation();
+        // ignore multiple 'dragenter' as we go over existing items
         if (this.moving)
-            return; // ignore multiple 'dragenter' as we go over existing items
+            return;
         this.moving = true;
         const ev = dd_utils_1.DDUtils.initEvent(event, { target: this.el, type: 'dropover' });
         if (this.option.over) {
@@ -3459,7 +3533,13 @@ class DDDroppable extends dd_base_impl_1.DDBaseImplement {
         this.el.addEventListener('dragover', this._dragOver);
         this.el.addEventListener('drop', this._drop);
         this.el.addEventListener('dragleave', this._dragLeave);
-        this.el.classList.add('ui-droppable-over');
+        // Update: removed that as it causes nested grids to no receive dragenter events when parent drags and sets this for #992. not seeing cursor flicker (chrome).
+        // this.el.classList.add('ui-droppable-over');
+        // make sure when we enter this, that the last one gets a leave to correctly cleanup as we don't always do
+        if (DDDroppable.lastActive && DDDroppable.lastActive !== this) {
+            DDDroppable.lastActive._dragLeave(event, true);
+        }
+        DDDroppable.lastActive = this;
     }
     /** @internal called when an moving to drop item is being dragged over - do nothing but eat the event */
     _dragOver(event) {
@@ -3467,26 +3547,35 @@ class DDDroppable extends dd_base_impl_1.DDBaseImplement {
         event.stopPropagation();
     }
     /** @internal called when the item is leaving our area, stop tracking if we had moving item */
-    _dragLeave(event) {
-        // ignore leave events on our children (get when starting to drag our items)
-        // Note: Safari Mac has null relatedTarget which causes #1684 so check if DragEvent is inside the grid instead
-        if (!event.relatedTarget) {
-            const { bottom, left, right, top } = this.el.getBoundingClientRect();
-            if (event.x < right && event.x > left && event.y < bottom && event.y > top)
+    _dragLeave(event, forceLeave) {
+        var _a;
+        // TEST console.log(`${count++} Leave ${(this.el as GridHTMLElement).gridstack.opts.id}`);
+        event.preventDefault();
+        event.stopPropagation();
+        // ignore leave events on our children (we get them when starting to drag our items)
+        // but exclude nested grids since we would still be leaving ourself, 
+        // but don't handle leave if we're dragging a nested grid around
+        if (!forceLeave) {
+            let onChild = dd_utils_1.DDUtils.inside(event, this.el);
+            let drag = dd_manager_1.DDManager.dragElement.el;
+            if (onChild && !((_a = drag.gridstackNode) === null || _a === void 0 ? void 0 : _a.subGrid)) { // dragging a nested grid ?
+                let nestedEl = this.el.gridstack.engine.nodes.filter(n => n.subGrid).map(n => n.subGrid.el);
+                onChild = !nestedEl.some(el => dd_utils_1.DDUtils.inside(event, el));
+            }
+            if (onChild)
                 return;
         }
-        else if (this.el.contains(event.relatedTarget))
-            return;
-        this._removeLeaveCallbacks();
         if (this.moving) {
-            event.preventDefault();
             const ev = dd_utils_1.DDUtils.initEvent(event, { target: this.el, type: 'dropout' });
             if (this.option.out) {
                 this.option.out(ev, this._ui(dd_manager_1.DDManager.dragElement));
             }
             this.triggerEvent('dropout', ev);
         }
-        delete this.moving;
+        this._removeLeaveCallbacks();
+        if (DDDroppable.lastActive === this) {
+            delete DDDroppable.lastActive;
+        }
     }
     /** @internal item is being dropped on us - call the client drop event */
     _drop(event) {
@@ -3499,17 +3588,18 @@ class DDDroppable extends dd_base_impl_1.DDBaseImplement {
         }
         this.triggerEvent('drop', ev);
         this._removeLeaveCallbacks();
-        delete this.moving;
     }
     /** @internal called to remove callbacks when leaving or dropping */
     _removeLeaveCallbacks() {
-        this.el.removeEventListener('dragleave', this._dragLeave);
-        this.el.classList.remove('ui-droppable-over');
-        if (this.moving) {
-            this.el.removeEventListener('dragover', this._dragOver);
-            this.el.removeEventListener('drop', this._drop);
+        if (!this.moving) {
+            return;
         }
-        // Note: this.moving is reset by callee of this routine to control the flow
+        delete this.moving;
+        this.el.removeEventListener('dragover', this._dragOver);
+        this.el.removeEventListener('drop', this._drop);
+        this.el.removeEventListener('dragleave', this._dragLeave);
+        // Update: removed that as it causes nested grids to no receive dragenter events when parent drags and sets this for #992. not seeing cursor flicker (chrome).
+        // this.el.classList.remove('ui-droppable-over');
     }
     /** @internal */
     _canDrop() {
@@ -3545,7 +3635,7 @@ exports.DDDroppable = DDDroppable;
 
 
 /**
- * dd-elements.ts 4.3.1
+ * dd-elements.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -3649,7 +3739,7 @@ exports.DDElement = DDElement;
 
 
 /**
- * dd-manager.ts 4.3.1
+ * dd-manager.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -3669,8 +3759,8 @@ exports.DDManager = DDManager;
 
 
 /**
- * dd-resizable-handle.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * dd-resizable-handle.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDResizableHandle = void 0;
@@ -3760,8 +3850,8 @@ DDResizableHandle.prefix = 'ui-resizable-';
 
 
 /**
- * dd-resizable.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * dd-resizable.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDResizable = void 0;
@@ -3948,9 +4038,8 @@ class DDResizable extends dd_base_impl_1.DDBaseImplement {
         if (window.getComputedStyle(this.el.parentElement).position.match(/static/)) {
             this.el.parentElement.style.position = 'relative';
         }
-        this.el.style.position = this.option.basePosition || 'absolute'; // or 'fixed'
+        this.el.style.position = 'absolute';
         this.el.style.opacity = '0.8';
-        this.el.style.zIndex = '1000';
         return this;
     }
     /** @internal */
@@ -4051,7 +4140,7 @@ DDResizable._originStyleProp = ['width', 'height', 'position', 'left', 'top', 'o
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DDUtils = void 0;
 /**
- * dd-utils.ts 4.3.1
+ * dd-utils.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 class DDUtils {
@@ -4112,6 +4201,18 @@ class DDUtils {
         ['pageX', 'pageY', 'clientX', 'clientY', 'screenX', 'screenY'].forEach(p => evt[p] = e[p]); // point info
         return Object.assign(Object.assign({}, evt), obj);
     }
+    /** returns true if event is inside the given element rectangle */
+    // Note: Safari Mac has null event.relatedTarget which causes #1684 so check if DragEvent is inside the coordinates instead
+    //    this.el.contains(event.relatedTarget as HTMLElement)
+    static inside(e, el) {
+        // srcElement, toElement, target: all set to placeholder when leaving simple grid, so we can't use that (Chrome)
+        let target = e.relatedTarget || e.fromElement;
+        if (!target) {
+            const { bottom, left, right, top } = el.getBoundingClientRect();
+            return (e.x < right && e.x > left && e.y < bottom && e.y > top);
+        }
+        return el.contains(target);
+    }
 }
 exports.DDUtils = DDUtils;
 DDUtils.isEventSupportPassiveOption = ((() => {
@@ -4140,8 +4241,8 @@ DDUtils.isEventSupportPassiveOption = ((() => {
 
 
 /**
- * gridstack-dd-native.ts 4.3.1
- * Copyright (c) 2021 Alain Dumesny - see GridStack root license
+ * gridstack-dd-native.ts 5.1.1
+ * Copyright (c) 2021-2022 Alain Dumesny - see GridStack root license
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -4289,7 +4390,7 @@ gridstack_dd_1.GridStackDD.registerPlugin(GridStackDDNative);
 
 
 /**
- * types.ts 4.3.1
+ * types.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -4305,7 +4406,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 
 /**
- * utils.ts 4.3.1
+ * utils.ts 5.1.1
  * Copyright (c) 2021 Alain Dumesny - see GridStack root license
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -4520,25 +4621,25 @@ class Utils {
         }
         return true;
     }
-    /* copies over b size & position (GridStackPosition), and possibly min/max as well */
-    static copyPos(a, b, minMax = false) {
+    /** copies over b size & position (GridStackPosition), and possibly min/max as well */
+    static copyPos(a, b, doMinMax = false) {
         a.x = b.x;
         a.y = b.y;
         a.w = b.w;
         a.h = b.h;
-        if (!minMax)
-            return a;
-        if (b.minW)
-            a.minW = b.minW;
-        if (b.minH)
-            a.minH = b.minH;
-        if (b.maxW)
-            a.maxW = b.maxW;
-        if (b.maxH)
-            a.maxH = b.maxH;
+        if (doMinMax) {
+            if (b.minW)
+                a.minW = b.minW;
+            if (b.minH)
+                a.minH = b.minH;
+            if (b.maxW)
+                a.maxW = b.maxW;
+            if (b.maxH)
+                a.maxH = b.maxH;
+        }
         return a;
     }
-    /* true if a and b has same size & position */
+    /** true if a and b has same size & position */
     static samePos(a, b) {
         return a && b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
     }
@@ -4563,11 +4664,12 @@ class Utils {
             }
         }
     }
-    /** return the closest parent matching the given class */
+    /** return the closest parent (or itself) matching the given class */
     static closestByClass(el, name) {
-        while (el = el.parentElement) {
+        while (el) {
             if (el.classList.contains(name))
                 return el;
+            el = el.parentElement;
         }
         return null;
     }
@@ -4602,7 +4704,7 @@ class Utils {
     /** @internal returns the passed element if scrollable, else the closest parent that will, up to the entire document scrolling element */
     static getScrollElement(el) {
         if (!el)
-            return document.scrollingElement;
+            return document.scrollingElement || document.documentElement; // IE support
         const style = getComputedStyle(el);
         const overflowRegex = /(auto|scroll)/;
         if (overflowRegex.test(style.overflow + style.overflowY)) {
@@ -5013,6 +5115,7 @@ class Subject extends _Observable__WEBPACK_IMPORTED_MODULE_0__.Observable {
     constructor() {
         super();
         this.closed = false;
+        this.currentObservers = null;
         this.observers = [];
         this.isStopped = false;
         this.hasError = false;
@@ -5032,8 +5135,10 @@ class Subject extends _Observable__WEBPACK_IMPORTED_MODULE_0__.Observable {
         (0,_util_errorContext__WEBPACK_IMPORTED_MODULE_2__.errorContext)(() => {
             this._throwIfClosed();
             if (!this.isStopped) {
-                const copy = this.observers.slice();
-                for (const observer of copy) {
+                if (!this.currentObservers) {
+                    this.currentObservers = Array.from(this.observers);
+                }
+                for (const observer of this.currentObservers) {
                     observer.next(value);
                 }
             }
@@ -5066,7 +5171,7 @@ class Subject extends _Observable__WEBPACK_IMPORTED_MODULE_0__.Observable {
     }
     unsubscribe() {
         this.isStopped = this.closed = true;
-        this.observers = null;
+        this.observers = this.currentObservers = null;
     }
     get observed() {
         var _a;
@@ -5083,9 +5188,15 @@ class Subject extends _Observable__WEBPACK_IMPORTED_MODULE_0__.Observable {
     }
     _innerSubscribe(subscriber) {
         const { hasError, isStopped, observers } = this;
-        return hasError || isStopped
-            ? _Subscription__WEBPACK_IMPORTED_MODULE_3__.EMPTY_SUBSCRIPTION
-            : (observers.push(subscriber), new _Subscription__WEBPACK_IMPORTED_MODULE_3__.Subscription(() => (0,_util_arrRemove__WEBPACK_IMPORTED_MODULE_4__.arrRemove)(observers, subscriber)));
+        if (hasError || isStopped) {
+            return _Subscription__WEBPACK_IMPORTED_MODULE_3__.EMPTY_SUBSCRIPTION;
+        }
+        this.currentObservers = null;
+        observers.push(subscriber);
+        return new _Subscription__WEBPACK_IMPORTED_MODULE_3__.Subscription(() => {
+            this.currentObservers = null;
+            (0,_util_arrRemove__WEBPACK_IMPORTED_MODULE_4__.arrRemove)(observers, subscriber);
+        });
     }
     _checkFinalizedStatuses(subscriber) {
         const { hasError, thrownError, isStopped } = this;
@@ -5147,11 +5258,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _util_isFunction__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./util/isFunction */ 2971);
 /* harmony import */ var _Subscription__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Subscription */ 6078);
 /* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./config */ 9057);
-/* harmony import */ var _util_reportUnhandledError__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./util/reportUnhandledError */ 4709);
-/* harmony import */ var _util_noop__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./util/noop */ 9635);
+/* harmony import */ var _util_reportUnhandledError__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./util/reportUnhandledError */ 4709);
+/* harmony import */ var _util_noop__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./util/noop */ 9635);
 /* harmony import */ var _NotificationFactories__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./NotificationFactories */ 3279);
-/* harmony import */ var _scheduler_timeoutProvider__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./scheduler/timeoutProvider */ 3542);
-/* harmony import */ var _util_errorContext__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./util/errorContext */ 2309);
+/* harmony import */ var _scheduler_timeoutProvider__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./scheduler/timeoutProvider */ 3542);
+/* harmony import */ var _util_errorContext__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./util/errorContext */ 2309);
 
 
 
@@ -5230,61 +5341,100 @@ class Subscriber extends _Subscription__WEBPACK_IMPORTED_MODULE_0__.Subscription
         }
     }
 }
+const _bind = Function.prototype.bind;
+function bind(fn, thisArg) {
+    return _bind.call(fn, thisArg);
+}
+class ConsumerObserver {
+    constructor(partialObserver) {
+        this.partialObserver = partialObserver;
+    }
+    next(value) {
+        const { partialObserver } = this;
+        if (partialObserver.next) {
+            try {
+                partialObserver.next(value);
+            }
+            catch (error) {
+                handleUnhandledError(error);
+            }
+        }
+    }
+    error(err) {
+        const { partialObserver } = this;
+        if (partialObserver.error) {
+            try {
+                partialObserver.error(err);
+            }
+            catch (error) {
+                handleUnhandledError(error);
+            }
+        }
+        else {
+            handleUnhandledError(err);
+        }
+    }
+    complete() {
+        const { partialObserver } = this;
+        if (partialObserver.complete) {
+            try {
+                partialObserver.complete();
+            }
+            catch (error) {
+                handleUnhandledError(error);
+            }
+        }
+    }
+}
 class SafeSubscriber extends Subscriber {
     constructor(observerOrNext, error, complete) {
         super();
-        let next;
-        if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_2__.isFunction)(observerOrNext)) {
-            next = observerOrNext;
+        let partialObserver;
+        if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_2__.isFunction)(observerOrNext) || !observerOrNext) {
+            partialObserver = {
+                next: observerOrNext !== null && observerOrNext !== void 0 ? observerOrNext : undefined,
+                error: error !== null && error !== void 0 ? error : undefined,
+                complete: complete !== null && complete !== void 0 ? complete : undefined,
+            };
         }
-        else if (observerOrNext) {
-            ({ next, error, complete } = observerOrNext);
+        else {
             let context;
             if (this && _config__WEBPACK_IMPORTED_MODULE_3__.config.useDeprecatedNextContext) {
                 context = Object.create(observerOrNext);
                 context.unsubscribe = () => this.unsubscribe();
+                partialObserver = {
+                    next: observerOrNext.next && bind(observerOrNext.next, context),
+                    error: observerOrNext.error && bind(observerOrNext.error, context),
+                    complete: observerOrNext.complete && bind(observerOrNext.complete, context),
+                };
             }
             else {
-                context = observerOrNext;
+                partialObserver = observerOrNext;
             }
-            next = next === null || next === void 0 ? void 0 : next.bind(context);
-            error = error === null || error === void 0 ? void 0 : error.bind(context);
-            complete = complete === null || complete === void 0 ? void 0 : complete.bind(context);
         }
-        this.destination = {
-            next: next ? wrapForErrorHandling(next, this) : _util_noop__WEBPACK_IMPORTED_MODULE_4__.noop,
-            error: wrapForErrorHandling(error !== null && error !== void 0 ? error : defaultErrorHandler, this),
-            complete: complete ? wrapForErrorHandling(complete, this) : _util_noop__WEBPACK_IMPORTED_MODULE_4__.noop,
-        };
+        this.destination = new ConsumerObserver(partialObserver);
     }
 }
-function wrapForErrorHandling(handler, instance) {
-    return (...args) => {
-        try {
-            handler(...args);
-        }
-        catch (err) {
-            if (_config__WEBPACK_IMPORTED_MODULE_3__.config.useDeprecatedSynchronousErrorHandling) {
-                (0,_util_errorContext__WEBPACK_IMPORTED_MODULE_5__.captureError)(err);
-            }
-            else {
-                (0,_util_reportUnhandledError__WEBPACK_IMPORTED_MODULE_6__.reportUnhandledError)(err);
-            }
-        }
-    };
+function handleUnhandledError(error) {
+    if (_config__WEBPACK_IMPORTED_MODULE_3__.config.useDeprecatedSynchronousErrorHandling) {
+        (0,_util_errorContext__WEBPACK_IMPORTED_MODULE_4__.captureError)(error);
+    }
+    else {
+        (0,_util_reportUnhandledError__WEBPACK_IMPORTED_MODULE_5__.reportUnhandledError)(error);
+    }
 }
 function defaultErrorHandler(err) {
     throw err;
 }
 function handleStoppedNotification(notification, subscriber) {
     const { onStoppedNotification } = _config__WEBPACK_IMPORTED_MODULE_3__.config;
-    onStoppedNotification && _scheduler_timeoutProvider__WEBPACK_IMPORTED_MODULE_7__.timeoutProvider.setTimeout(() => onStoppedNotification(notification, subscriber));
+    onStoppedNotification && _scheduler_timeoutProvider__WEBPACK_IMPORTED_MODULE_6__.timeoutProvider.setTimeout(() => onStoppedNotification(notification, subscriber));
 }
 const EMPTY_OBSERVER = {
     closed: true,
-    next: _util_noop__WEBPACK_IMPORTED_MODULE_4__.noop,
+    next: _util_noop__WEBPACK_IMPORTED_MODULE_7__.noop,
     error: defaultErrorHandler,
-    complete: _util_noop__WEBPACK_IMPORTED_MODULE_4__.noop,
+    complete: _util_noop__WEBPACK_IMPORTED_MODULE_7__.noop,
 };
 
 
@@ -5313,7 +5463,7 @@ class Subscription {
         this.initialTeardown = initialTeardown;
         this.closed = false;
         this._parentage = null;
-        this._teardowns = null;
+        this._finalizers = null;
     }
     unsubscribe() {
         let errors;
@@ -5331,21 +5481,21 @@ class Subscription {
                     _parentage.remove(this);
                 }
             }
-            const { initialTeardown } = this;
-            if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(initialTeardown)) {
+            const { initialTeardown: initialFinalizer } = this;
+            if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(initialFinalizer)) {
                 try {
-                    initialTeardown();
+                    initialFinalizer();
                 }
                 catch (e) {
                     errors = e instanceof _util_UnsubscriptionError__WEBPACK_IMPORTED_MODULE_1__.UnsubscriptionError ? e.errors : [e];
                 }
             }
-            const { _teardowns } = this;
-            if (_teardowns) {
-                this._teardowns = null;
-                for (const teardown of _teardowns) {
+            const { _finalizers } = this;
+            if (_finalizers) {
+                this._finalizers = null;
+                for (const finalizer of _finalizers) {
                     try {
-                        execTeardown(teardown);
+                        execFinalizer(finalizer);
                     }
                     catch (err) {
                         errors = errors !== null && errors !== void 0 ? errors : [];
@@ -5367,7 +5517,7 @@ class Subscription {
         var _a;
         if (teardown && teardown !== this) {
             if (this.closed) {
-                execTeardown(teardown);
+                execFinalizer(teardown);
             }
             else {
                 if (teardown instanceof Subscription) {
@@ -5376,7 +5526,7 @@ class Subscription {
                     }
                     teardown._addParent(this);
                 }
-                (this._teardowns = (_a = this._teardowns) !== null && _a !== void 0 ? _a : []).push(teardown);
+                (this._finalizers = (_a = this._finalizers) !== null && _a !== void 0 ? _a : []).push(teardown);
             }
         }
     }
@@ -5398,8 +5548,8 @@ class Subscription {
         }
     }
     remove(teardown) {
-        const { _teardowns } = this;
-        _teardowns && (0,_util_arrRemove__WEBPACK_IMPORTED_MODULE_2__.arrRemove)(_teardowns, teardown);
+        const { _finalizers } = this;
+        _finalizers && (0,_util_arrRemove__WEBPACK_IMPORTED_MODULE_2__.arrRemove)(_finalizers, teardown);
         if (teardown instanceof Subscription) {
             teardown._removeParent(this);
         }
@@ -5415,12 +5565,12 @@ function isSubscription(value) {
     return (value instanceof Subscription ||
         (value && 'closed' in value && (0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(value.remove) && (0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(value.add) && (0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(value.unsubscribe)));
 }
-function execTeardown(teardown) {
-    if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(teardown)) {
-        teardown();
+function execFinalizer(finalizer) {
+    if ((0,_util_isFunction__WEBPACK_IMPORTED_MODULE_0__.isFunction)(finalizer)) {
+        finalizer();
     }
     else {
-        teardown.unsubscribe();
+        finalizer.unsubscribe();
     }
 }
 
@@ -5501,7 +5651,7 @@ class ConnectableObservable extends _Observable__WEBPACK_IMPORTED_MODULE_0__.Obs
         if (!connection) {
             connection = this._connection = new _Subscription__WEBPACK_IMPORTED_MODULE_2__.Subscription();
             const subject = this.getSubject();
-            connection.add(this.source.subscribe(new _operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_3__.OperatorSubscriber(subject, undefined, () => {
+            connection.add(this.source.subscribe((0,_operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_3__.createOperatorSubscriber)(subject, undefined, () => {
                 this._teardown();
                 subject.complete();
             }, (err) => {
@@ -5577,7 +5727,7 @@ function combineLatestInit(observables, scheduler, valueTransform = _util_identi
                 maybeSchedule(scheduler, () => {
                     const source = (0,_from__WEBPACK_IMPORTED_MODULE_2__.from)(observables[i], scheduler);
                     let hasFirstValue = false;
-                    source.subscribe(new _operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_7__.OperatorSubscriber(subscriber, (value) => {
+                    source.subscribe((0,_operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_7__.createOperatorSubscriber)(subscriber, (value) => {
                         values[i] = value;
                         if (!hasFirstValue) {
                             hasFirstValue = true;
@@ -5716,7 +5866,7 @@ function forkJoin(...args) {
         let remainingEmissions = length;
         for (let sourceIndex = 0; sourceIndex < length; sourceIndex++) {
             let hasValue = false;
-            (0,_innerFrom__WEBPACK_IMPORTED_MODULE_3__.innerFrom)(sources[sourceIndex]).subscribe(new _operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_4__.OperatorSubscriber(subscriber, (value) => {
+            (0,_innerFrom__WEBPACK_IMPORTED_MODULE_3__.innerFrom)(sources[sourceIndex]).subscribe((0,_operators_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_4__.createOperatorSubscriber)(subscriber, (value) => {
                 if (!hasValue) {
                     hasValue = true;
                     remainingEmissions--;
@@ -6131,14 +6281,19 @@ function timer(dueTime = 0, intervalOrScheduler, scheduler = _scheduler_async__W
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "createOperatorSubscriber": () => (/* binding */ createOperatorSubscriber),
 /* harmony export */   "OperatorSubscriber": () => (/* binding */ OperatorSubscriber)
 /* harmony export */ });
 /* harmony import */ var _Subscriber__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Subscriber */ 9904);
 
+function createOperatorSubscriber(destination, onNext, onComplete, onError, onFinalize) {
+    return new OperatorSubscriber(destination, onNext, onComplete, onError, onFinalize);
+}
 class OperatorSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscriber {
-    constructor(destination, onNext, onComplete, onError, onFinalize) {
+    constructor(destination, onNext, onComplete, onError, onFinalize, shouldUnsubscribe) {
         super(destination);
         this.onFinalize = onFinalize;
+        this.shouldUnsubscribe = shouldUnsubscribe;
         this._next = onNext
             ? function (value) {
                 try {
@@ -6178,9 +6333,11 @@ class OperatorSubscriber extends _Subscriber__WEBPACK_IMPORTED_MODULE_0__.Subscr
     }
     unsubscribe() {
         var _a;
-        const { closed } = this;
-        super.unsubscribe();
-        !closed && ((_a = this.onFinalize) === null || _a === void 0 ? void 0 : _a.call(this));
+        if (!this.shouldUnsubscribe || this.shouldUnsubscribe()) {
+            const { closed } = this;
+            super.unsubscribe();
+            !closed && ((_a = this.onFinalize) === null || _a === void 0 ? void 0 : _a.call(this));
+        }
     }
 }
 
@@ -6224,11 +6381,11 @@ function audit(durationSelector) {
             durationSubscriber = null;
             isComplete && subscriber.complete();
         };
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             hasValue = true;
             lastValue = value;
             if (!durationSubscriber) {
-                (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_2__.innerFrom)(durationSelector(value)).subscribe((durationSubscriber = new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, endDuration, cleanupDuration)));
+                (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_2__.innerFrom)(durationSelector(value)).subscribe((durationSubscriber = (0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, endDuration, cleanupDuration)));
             }
         }, () => {
             isComplete = true;
@@ -6283,7 +6440,7 @@ function catchError(selector) {
         let innerSub = null;
         let syncUnsub = false;
         let handledResult;
-        innerSub = source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, undefined, undefined, (err) => {
+        innerSub = source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, undefined, undefined, (err) => {
             handledResult = (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_2__.innerFrom)(selector(err, catchError(selector)(source)));
             if (innerSub) {
                 innerSub.unsubscribe();
@@ -6390,7 +6547,7 @@ function debounceTime(dueTime, scheduler = _scheduler_async__WEBPACK_IMPORTED_MO
       emit();
     }
 
-    source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, value => {
+    source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, value => {
       lastValue = value;
       lastTime = scheduler.now();
 
@@ -6426,7 +6583,7 @@ __webpack_require__.r(__webpack_exports__);
 function defaultIfEmpty(defaultValue) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let hasValue = false;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             hasValue = true;
             subscriber.next(value);
         }, () => {
@@ -6462,7 +6619,7 @@ function distinctUntilChanged(comparator, keySelector = _util_identity__WEBPACK_
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_1__.operate)((source, subscriber) => {
         let previousKey;
         let first = true;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, (value) => {
             const currentKey = keySelector(value);
             if (first || !comparator(previousKey, currentKey)) {
                 first = false;
@@ -6496,7 +6653,7 @@ __webpack_require__.r(__webpack_exports__);
 function filter(predicate, thisArg) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let index = 0;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => predicate.call(thisArg, value, index++) && subscriber.next(value)));
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => predicate.call(thisArg, value, index++) && subscriber.next(value)));
     });
 }
 
@@ -6606,7 +6763,7 @@ __webpack_require__.r(__webpack_exports__);
 function map(project, thisArg) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let index = 0;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             subscriber.next(project.call(thisArg, value, index++));
         }));
     });
@@ -6652,7 +6809,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, expand, innerSubScheduler, additionalTeardown) {
+function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, expand, innerSubScheduler, additionalFinalizer) {
     const buffer = [];
     let active = 0;
     let index = 0;
@@ -6667,7 +6824,7 @@ function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, e
         expand && subscriber.next(value);
         active++;
         let innerComplete = false;
-        (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_0__.innerFrom)(project(value, index++)).subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (innerValue) => {
+        (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_0__.innerFrom)(project(value, index++)).subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (innerValue) => {
             onBeforeNext === null || onBeforeNext === void 0 ? void 0 : onBeforeNext(innerValue);
             if (expand) {
                 outerNext(innerValue);
@@ -6698,12 +6855,12 @@ function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, e
             }
         }));
     };
-    source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, outerNext, () => {
+    source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, outerNext, () => {
         isComplete = true;
         checkComplete();
     }));
     return () => {
-        additionalTeardown === null || additionalTeardown === void 0 ? void 0 : additionalTeardown();
+        additionalFinalizer === null || additionalFinalizer === void 0 ? void 0 : additionalFinalizer();
     };
 }
 
@@ -6761,7 +6918,7 @@ __webpack_require__.r(__webpack_exports__);
 
 function observeOn(scheduler, delay = 0) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.next(value), delay), () => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.complete(), delay), (err) => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.error(err), delay)));
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.next(value), delay), () => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.complete(), delay), (err) => (0,_util_executeSchedule__WEBPACK_IMPORTED_MODULE_2__.executeSchedule)(subscriber, scheduler, () => subscriber.error(err), delay)));
     });
 }
 
@@ -6786,7 +6943,7 @@ function pairwise() {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let prev;
         let hasPrev = false;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             const p = prev;
             prev = value;
             hasPrev && subscriber.next([p, value]);
@@ -6816,7 +6973,7 @@ function refCount() {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let connection = null;
         source._refCount++;
-        const refCounter = new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, undefined, undefined, undefined, () => {
+        const refCounter = (0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, undefined, undefined, undefined, () => {
             if (!source || source._refCount <= 0 || 0 < --source._refCount) {
                 connection = null;
                 return;
@@ -6877,7 +7034,7 @@ function scanInternals(accumulator, seed, hasSeed, emitOnNext, emitBeforeComplet
         let hasState = hasSeed;
         let state = seed;
         let index = 0;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_0__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_0__.createOperatorSubscriber)(subscriber, (value) => {
             const i = index++;
             state = hasState
                 ?
@@ -7004,14 +7161,10 @@ __webpack_require__.r(__webpack_exports__);
 
 
 function shareReplay(configOrBufferSize, windowTime, scheduler) {
-    var _a, _b;
     let bufferSize;
     let refCount = false;
     if (configOrBufferSize && typeof configOrBufferSize === 'object') {
-        bufferSize = (_a = configOrBufferSize.bufferSize) !== null && _a !== void 0 ? _a : Infinity;
-        windowTime = (_b = configOrBufferSize.windowTime) !== null && _b !== void 0 ? _b : Infinity;
-        refCount = !!configOrBufferSize.refCount;
-        scheduler = configOrBufferSize.scheduler;
+        ({ bufferSize = Infinity, windowTime = Infinity, refCount = false, scheduler } = configOrBufferSize);
     }
     else {
         bufferSize = configOrBufferSize !== null && configOrBufferSize !== void 0 ? configOrBufferSize : Infinity;
@@ -7115,11 +7268,11 @@ function switchMap(project, resultSelector) {
         let index = 0;
         let isComplete = false;
         const checkComplete = () => isComplete && !innerSubscriber && subscriber.complete();
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             innerSubscriber === null || innerSubscriber === void 0 ? void 0 : innerSubscriber.unsubscribe();
             let innerIndex = 0;
             const outerIndex = index++;
-            (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_2__.innerFrom)(project(value, outerIndex)).subscribe((innerSubscriber = new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (innerValue) => subscriber.next(resultSelector ? resultSelector(value, innerValue, outerIndex, innerIndex++) : innerValue), () => {
+            (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_2__.innerFrom)(project(value, outerIndex)).subscribe((innerSubscriber = (0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (innerValue) => subscriber.next(resultSelector ? resultSelector(value, innerValue, outerIndex, innerIndex++) : innerValue), () => {
                 innerSubscriber = null;
                 checkComplete();
             })));
@@ -7155,7 +7308,7 @@ function take(count) {
             () => _observable_empty__WEBPACK_IMPORTED_MODULE_0__.EMPTY
         : (0,_util_lift__WEBPACK_IMPORTED_MODULE_1__.operate)((source, subscriber) => {
             let seen = 0;
-            source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, (value) => {
+            source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, (value) => {
                 if (++seen <= count) {
                     subscriber.next(value);
                     if (count <= seen) {
@@ -7190,7 +7343,7 @@ function takeLast(count) {
         ? () => _observable_empty__WEBPACK_IMPORTED_MODULE_0__.EMPTY
         : (0,_util_lift__WEBPACK_IMPORTED_MODULE_1__.operate)((source, subscriber) => {
             let buffer = [];
-            source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, (value) => {
+            source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, (value) => {
                 buffer.push(value);
                 count < buffer.length && buffer.shift();
             }, () => {
@@ -7227,7 +7380,7 @@ __webpack_require__.r(__webpack_exports__);
 
 function takeUntil(notifier) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
-        (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_1__.innerFrom)(notifier).subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, () => subscriber.complete(), _util_noop__WEBPACK_IMPORTED_MODULE_3__.noop));
+        (0,_observable_innerFrom__WEBPACK_IMPORTED_MODULE_1__.innerFrom)(notifier).subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, () => subscriber.complete(), _util_noop__WEBPACK_IMPORTED_MODULE_3__.noop));
         !subscriber.closed && source.subscribe(subscriber);
     });
 }
@@ -7252,7 +7405,7 @@ __webpack_require__.r(__webpack_exports__);
 function takeWhile(predicate, inclusive = false) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let index = 0;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             const result = predicate(value, index++);
             (result || inclusive) && subscriber.next(value);
             !result && subscriber.complete();
@@ -7291,7 +7444,7 @@ function tap(observerOrNext, error, complete) {
             var _a;
             (_a = tapObserver.subscribe) === null || _a === void 0 ? void 0 : _a.call(tapObserver);
             let isUnsub = true;
-            source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.OperatorSubscriber(subscriber, (value) => {
+            source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_2__.createOperatorSubscriber)(subscriber, (value) => {
                 var _a;
                 (_a = tapObserver.next) === null || _a === void 0 ? void 0 : _a.call(tapObserver, value);
                 subscriber.next(value);
@@ -7339,7 +7492,7 @@ __webpack_require__.r(__webpack_exports__);
 function throwIfEmpty(errorFactory = defaultErrorFactory) {
     return (0,_util_lift__WEBPACK_IMPORTED_MODULE_0__.operate)((source, subscriber) => {
         let hasValue = false;
-        source.subscribe(new _OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.OperatorSubscriber(subscriber, (value) => {
+        source.subscribe((0,_OperatorSubscriber__WEBPACK_IMPORTED_MODULE_1__.createOperatorSubscriber)(subscriber, (value) => {
             hasValue = true;
             subscriber.next(value);
         }, () => (hasValue ? subscriber.complete() : subscriber.error(errorFactory()))));
@@ -8085,9 +8238,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "intervalProvider": () => (/* binding */ intervalProvider)
 /* harmony export */ });
 const intervalProvider = {
-    setInterval(...args) {
+    setInterval(handler, timeout, ...args) {
         const { delegate } = intervalProvider;
-        return ((delegate === null || delegate === void 0 ? void 0 : delegate.setInterval) || setInterval)(...args);
+        if (delegate === null || delegate === void 0 ? void 0 : delegate.setInterval) {
+            return delegate.setInterval(handler, timeout, ...args);
+        }
+        return setInterval(handler, timeout, ...args);
     },
     clearInterval(handle) {
         const { delegate } = intervalProvider;
@@ -8110,9 +8266,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "timeoutProvider": () => (/* binding */ timeoutProvider)
 /* harmony export */ });
 const timeoutProvider = {
-    setTimeout(...args) {
+    setTimeout(handler, timeout, ...args) {
         const { delegate } = timeoutProvider;
-        return ((delegate === null || delegate === void 0 ? void 0 : delegate.setTimeout) || setTimeout)(...args);
+        if (delegate === null || delegate === void 0 ? void 0 : delegate.setTimeout) {
+            return delegate.setTimeout(handler, timeout, ...args);
+        }
+        return setTimeout(handler, timeout, ...args);
     },
     clearTimeout(handle) {
         const { delegate } = timeoutProvider;
@@ -8881,9 +9040,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "__importStar": () => (/* binding */ __importStar),
 /* harmony export */   "__importDefault": () => (/* binding */ __importDefault),
 /* harmony export */   "__classPrivateFieldGet": () => (/* binding */ __classPrivateFieldGet),
-/* harmony export */   "__classPrivateFieldSet": () => (/* binding */ __classPrivateFieldSet)
+/* harmony export */   "__classPrivateFieldSet": () => (/* binding */ __classPrivateFieldSet),
+/* harmony export */   "__classPrivateFieldIn": () => (/* binding */ __classPrivateFieldIn)
 /* harmony export */ });
-/*! *****************************************************************************
+/******************************************************************************
 Copyright (c) Microsoft Corporation.
 
 Permission to use, copy, modify, and/or distribute this software for any
@@ -8992,7 +9152,11 @@ function __generator(thisArg, body) {
 
 var __createBinding = Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+        desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -9123,6 +9287,11 @@ function __classPrivateFieldSet(receiver, state, value, kind, f) {
     return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 }
 
+function __classPrivateFieldIn(state, receiver) {
+    if (receiver === null || (typeof receiver !== "object" && typeof receiver !== "function")) throw new TypeError("Cannot use 'in' operator on non-object");
+    return typeof state === "function" ? receiver === state : state.has(receiver);
+}
+
 
 /***/ }),
 
@@ -9155,8 +9324,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "ɵPRE_STYLE": () => (/* binding */ ɵPRE_STYLE)
 /* harmony export */ });
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -9173,8 +9342,8 @@ __webpack_require__.r(__webpack_exports__);
  * Apps do not typically need to create their own animation players, but if you
  * do need to, follow these steps:
  *
- * 1. Use the `build()` method to create a programmatic animation using the
- * `animate()` function. The method returns an `AnimationFactory` instance.
+ * 1. Use the <code>[AnimationBuilder.build](api/animations/AnimationBuilder#build)()</code> method
+ * to create a programmatic animation. The method returns an `AnimationFactory` instance.
  *
  * 2. Use the factory object to create an `AnimationPlayer` and attach it to a DOM element.
  *
@@ -9209,7 +9378,9 @@ __webpack_require__.r(__webpack_exports__);
 class AnimationBuilder {
 }
 /**
- * A factory object returned from the `AnimationBuilder`.`build()` method.
+ * A factory object returned from the
+ * <code>[AnimationBuilder.build](api/animations/AnimationBuilder#build)()</code>
+ * method.
  *
  * @publicApi
  */
@@ -9230,13 +9401,13 @@ class AnimationFactory {
  */
 const AUTO_STYLE = '*';
 /**
- * Creates a named animation trigger, containing a  list of `state()`
+ * Creates a named animation trigger, containing a  list of [`state()`](api/animations/state)
  * and `transition()` entries to be evaluated when the expression
  * bound to the trigger changes.
  *
  * @param name An identifying string.
- * @param definitions  An animation definition object, containing an array of `state()`
- * and `transition()` declarations.
+ * @param definitions  An animation definition object, containing an array of
+ * [`state()`](api/animations/state) and `transition()` declarations.
  *
  * @return An object that encapsulates the trigger data.
  *
@@ -9515,8 +9686,8 @@ function sequence(steps, options = null) {
 }
 /**
  * Declares a key/value object containing CSS properties/styles that
- * can then be used for an animation `state`, within an animation `sequence`,
- * or as styling data for calls to `animate()` and `keyframes()`.
+ * can then be used for an animation [`state`](api/animations/state), within an animation
+ *`sequence`, or as styling data for calls to `animate()` and `keyframes()`.
  *
  * @param tokens A set of CSS styles or HTML styles associated with an animation state.
  * The value can be any of the following:
@@ -10392,8 +10563,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_animations__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/animations */ 1631);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -10579,30 +10750,12 @@ if (_isNode || typeof Element !== 'undefined') {
   }
 
   _query = (element, selector, multi) => {
-    let results = [];
-
     if (multi) {
-      // DO NOT REFACTOR TO USE SPREAD SYNTAX.
-      // For element queries that return sufficiently large NodeList objects,
-      // using spread syntax to populate the results array causes a RangeError
-      // due to the call stack limit being reached. `Array.from` can not be used
-      // as well, since NodeList is not iterable in IE 11, see
-      // https://developer.mozilla.org/en-US/docs/Web/API/NodeList
-      // More info is available in #38551.
-      const elems = element.querySelectorAll(selector);
-
-      for (let i = 0; i < elems.length; i++) {
-        results.push(elems[i]);
-      }
-    } else {
-      const elm = element.querySelector(selector);
-
-      if (elm) {
-        results.push(elm);
-      }
+      return Array.from(element.querySelectorAll(selector));
     }
 
-    return results;
+    const elem = element.querySelector(selector);
+    return elem ? [elem] : [];
   };
 }
 
@@ -11941,7 +12094,7 @@ const LEAVE_TOKEN_REGEX = new RegExp(LEAVE_TOKEN, 'g');
  * from all previous keyframes up until where it is first used. For the timeline keyframe generation
  * to properly fill in the style it will place the previous value (the value from the parent
  * timeline) or a default value of `*` into the backFill object. Given that each of the keyframe
- * styles are objects that prototypically inherits from the backFill object, this means that if a
+ * styles is an object that prototypically inherits from the backFill object, this means that if a
  * value is added into the backFill then it will automatically propagate any missing values to all
  * keyframes. Therefore the missing `height` value will be properly filled into the already
  * processed keyframes.
@@ -11971,11 +12124,24 @@ class AnimationTimelineBuilderVisitor {
 
     const timelines = context.timelines.filter(timeline => timeline.containsAnimation());
 
-    if (timelines.length && Object.keys(finalStyles).length) {
-      const tl = timelines[timelines.length - 1];
+    if (Object.keys(finalStyles).length) {
+      // note: we just want to apply the final styles for the rootElement, so we do not
+      //       just apply the styles to the last timeline but the last timeline which
+      //       element is the root one (basically `*`-styles are replaced with the actual
+      //       state style values only for the root element)
+      let lastRootTimeline;
 
-      if (!tl.allowOnlyTimelineStyles()) {
-        tl.setStyles([finalStyles], null, context.errors, options);
+      for (let i = timelines.length - 1; i >= 0; i--) {
+        const timeline = timelines[i];
+
+        if (timeline.element === rootElement) {
+          lastRootTimeline = timeline;
+          break;
+        }
+      }
+
+      if (lastRootTimeline && !lastRootTimeline.allowOnlyTimelineStyles()) {
+        lastRootTimeline.setStyles([finalStyles], null, context.errors, options);
       }
     }
 
@@ -13529,11 +13695,14 @@ class AnimationTransitionNamespace {
   triggerLeaveAnimation(element, context, destroyAfterComplete, defaultToFallback) {
     const triggerStates = this._engine.statesByElement.get(element);
 
+    const previousTriggersValues = new Map();
+
     if (triggerStates) {
       const players = [];
       Object.keys(triggerStates).forEach(triggerName => {
-        // this check is here in the event that an element is removed
+        previousTriggersValues.set(triggerName, triggerStates[triggerName].value); // this check is here in the event that an element is removed
         // twice (both on the host level and the component level)
+
         if (this._triggers[triggerName]) {
           const player = this.trigger(element, triggerName, VOID_VALUE, defaultToFallback);
 
@@ -13544,7 +13713,7 @@ class AnimationTransitionNamespace {
       });
 
       if (players.length) {
-        this._engine.markElementAsRemoved(this.id, element, true, context);
+        this._engine.markElementAsRemoved(this.id, element, true, context, previousTriggersValues);
 
         if (destroyAfterComplete) {
           optimizeGroupPlayer(players).onDone(() => this._engine.processLeaveNode(element));
@@ -13964,13 +14133,14 @@ class TransitionAnimationEngine {
     }
   }
 
-  markElementAsRemoved(namespaceId, element, hasAnimation, context) {
+  markElementAsRemoved(namespaceId, element, hasAnimation, context, previousTriggersValues) {
     this.collectedLeaveElements.push(element);
     element[REMOVAL_FLAG] = {
       namespaceId,
       setForRemoval: context,
       hasAnimation,
-      removedBeforeQueried: false
+      removedBeforeQueried: false,
+      previousTriggersValues
     };
   }
 
@@ -14202,9 +14372,21 @@ class TransitionAnimationEngine {
         allPlayers.push(player);
 
         if (this.collectedEnterElements.length) {
-          const details = element[REMOVAL_FLAG]; // move animations are currently not supported...
+          const details = element[REMOVAL_FLAG]; // animations for move operations (elements being removed and reinserted,
+          // e.g. when the order of an *ngFor list changes) are currently not supported
 
           if (details && details.setForMove) {
+            if (details.previousTriggersValues && details.previousTriggersValues.has(entry.triggerName)) {
+              const previousValue = details.previousTriggersValues.get(entry.triggerName); // we need to restore the previous trigger value since the element has
+              // only been moved and hasn't actually left the DOM
+
+              const triggersWithStates = this.statesByElement.get(entry.element);
+
+              if (triggersWithStates && triggersWithStates[entry.triggerName]) {
+                triggersWithStates[entry.triggerName].value = previousValue;
+              }
+            }
+
             player.destroy();
             return;
           }
@@ -16122,21 +16304,21 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
-/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs */ 228);
-/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 6078);
+/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 228);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs */ 6078);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! rxjs */ 6317);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! rxjs */ 745);
-/* harmony import */ var _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @angular/cdk/keycodes */ 5939);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 9337);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! rxjs/operators */ 1989);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 116);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rxjs/operators */ 635);
+/* harmony import */ var _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/cdk/keycodes */ 5939);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! rxjs/operators */ 9337);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 1989);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rxjs/operators */ 116);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! rxjs/operators */ 635);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! rxjs/operators */ 9295);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! rxjs/operators */ 7260);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! rxjs/operators */ 8192);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! rxjs/operators */ 8951);
 /* harmony import */ var _angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @angular/cdk/coercion */ 6484);
-/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
 /* harmony import */ var _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! @angular/cdk/observers */ 5837);
 
 
@@ -16209,25 +16391,31 @@ function getAriaReferenceIds(el, attr) {
  * found in the LICENSE file at https://angular.io/license
  */
 
-/** ID used for the body container where all messages are appended. */
+/**
+ * ID used for the body container where all messages are appended.
+ * @deprecated No longer being used. To be removed.
+ * @breaking-change 14.0.0
+ */
 
 
 const MESSAGES_CONTAINER_ID = 'cdk-describedby-message-container';
-/** ID prefix used for each created message element. */
+/**
+ * ID prefix used for each created message element.
+ * @deprecated To be turned into a private variable.
+ * @breaking-change 14.0.0
+ */
 
 const CDK_DESCRIBEDBY_ID_PREFIX = 'cdk-describedby-message';
-/** Attribute given to each host element that is described by a message element. */
+/**
+ * Attribute given to each host element that is described by a message element.
+ * @deprecated To be turned into a private variable.
+ * @breaking-change 14.0.0
+ */
 
 const CDK_DESCRIBEDBY_HOST_ATTRIBUTE = 'cdk-describedby-host';
 /** Global incremental identifier for each registered message element. */
 
 let nextId = 0;
-/** Global map of all registered message elements that have been placed into the document. */
-
-const messageRegistry = new Map();
-/** Container for all registered messages. */
-
-let messagesContainer = null;
 /**
  * Utility that creates visually hidden elements with a message content. Useful for elements that
  * want to use aria-describedby to further describe themselves without adding additional visual
@@ -16235,7 +16423,22 @@ let messagesContainer = null;
  */
 
 class AriaDescriber {
-  constructor(_document) {
+  constructor(_document,
+  /**
+   * @deprecated To be turned into a required parameter.
+   * @breaking-change 14.0.0
+   */
+  _platform) {
+    this._platform = _platform;
+    /** Map of all registered message elements that have been placed into the document. */
+
+    this._messageRegistry = new Map();
+    /** Container for all registered messages. */
+
+    this._messagesContainer = null;
+    /** Unique ID for the service. */
+
+    this._id = `${nextId++}`;
     this._document = _document;
   }
 
@@ -16249,11 +16452,12 @@ class AriaDescriber {
     if (typeof message !== 'string') {
       // We need to ensure that the element has an ID.
       setMessageId(message);
-      messageRegistry.set(key, {
+
+      this._messageRegistry.set(key, {
         messageElement: message,
         referenceCount: 0
       });
-    } else if (!messageRegistry.has(key)) {
+    } else if (!this._messageRegistry.has(key)) {
       this._createMessageElement(message, role);
     }
 
@@ -16263,6 +16467,8 @@ class AriaDescriber {
   }
 
   removeDescription(hostElement, message, role) {
+    var _a;
+
     if (!message || !this._isElementNode(hostElement)) {
       return;
     }
@@ -16276,22 +16482,26 @@ class AriaDescriber {
 
 
     if (typeof message === 'string') {
-      const registeredMessage = messageRegistry.get(key);
+      const registeredMessage = this._messageRegistry.get(key);
 
       if (registeredMessage && registeredMessage.referenceCount === 0) {
         this._deleteMessageElement(key);
       }
     }
 
-    if (messagesContainer && messagesContainer.childNodes.length === 0) {
-      this._deleteMessagesContainer();
+    if (((_a = this._messagesContainer) === null || _a === void 0 ? void 0 : _a.childNodes.length) === 0) {
+      this._messagesContainer.remove();
+
+      this._messagesContainer = null;
     }
   }
   /** Unregisters all created message elements and removes the message container. */
 
 
   ngOnDestroy() {
-    const describedElements = this._document.querySelectorAll(`[${CDK_DESCRIBEDBY_HOST_ATTRIBUTE}]`);
+    var _a;
+
+    const describedElements = this._document.querySelectorAll(`[${CDK_DESCRIBEDBY_HOST_ATTRIBUTE}="${this._id}"]`);
 
     for (let i = 0; i < describedElements.length; i++) {
       this._removeCdkDescribedByReferenceIds(describedElements[i]);
@@ -16299,11 +16509,10 @@ class AriaDescriber {
       describedElements[i].removeAttribute(CDK_DESCRIBEDBY_HOST_ATTRIBUTE);
     }
 
-    if (messagesContainer) {
-      this._deleteMessagesContainer();
-    }
+    (_a = this._messagesContainer) === null || _a === void 0 ? void 0 : _a.remove();
+    this._messagesContainer = null;
 
-    messageRegistry.clear();
+    this._messageRegistry.clear();
   }
   /**
    * Creates a new element in the visually hidden message container element with the message
@@ -16323,8 +16532,9 @@ class AriaDescriber {
 
     this._createMessagesContainer();
 
-    messagesContainer.appendChild(messageElement);
-    messageRegistry.set(getKey(message, role), {
+    this._messagesContainer.appendChild(messageElement);
+
+    this._messageRegistry.set(getKey(message, role), {
       messageElement,
       referenceCount: 0
     });
@@ -16333,46 +16543,51 @@ class AriaDescriber {
 
 
   _deleteMessageElement(key) {
-    var _a;
+    var _a, _b;
 
-    const registeredMessage = messageRegistry.get(key);
-    (_a = registeredMessage === null || registeredMessage === void 0 ? void 0 : registeredMessage.messageElement) === null || _a === void 0 ? void 0 : _a.remove();
-    messageRegistry.delete(key);
+    (_b = (_a = this._messageRegistry.get(key)) === null || _a === void 0 ? void 0 : _a.messageElement) === null || _b === void 0 ? void 0 : _b.remove();
+
+    this._messageRegistry.delete(key);
   }
   /** Creates the global container for all aria-describedby messages. */
 
 
   _createMessagesContainer() {
-    if (!messagesContainer) {
-      const preExistingContainer = this._document.getElementById(MESSAGES_CONTAINER_ID); // When going from the server to the client, we may end up in a situation where there's
+    if (this._messagesContainer) {
+      return;
+    }
+
+    const containerClassName = 'cdk-describedby-message-container';
+
+    const serverContainers = this._document.querySelectorAll(`.${containerClassName}[platform="server"]`);
+
+    for (let i = 0; i < serverContainers.length; i++) {
+      // When going from the server to the client, we may end up in a situation where there's
       // already a container on the page, but we don't have a reference to it. Clear the
       // old container so we don't get duplicates. Doing this, instead of emptying the previous
       // container, should be slightly faster.
-
-
-      preExistingContainer === null || preExistingContainer === void 0 ? void 0 : preExistingContainer.remove();
-      messagesContainer = this._document.createElement('div');
-      messagesContainer.id = MESSAGES_CONTAINER_ID; // We add `visibility: hidden` in order to prevent text in this container from
-      // being searchable by the browser's Ctrl + F functionality.
-      // Screen-readers will still read the description for elements with aria-describedby even
-      // when the description element is not visible.
-
-      messagesContainer.style.visibility = 'hidden'; // Even though we use `visibility: hidden`, we still apply `cdk-visually-hidden` so that
-      // the description element doesn't impact page layout.
-
-      messagesContainer.classList.add('cdk-visually-hidden');
-
-      this._document.body.appendChild(messagesContainer);
+      serverContainers[i].remove();
     }
-  }
-  /** Deletes the global messages container. */
+
+    const messagesContainer = this._document.createElement('div'); // We add `visibility: hidden` in order to prevent text in this container from
+    // being searchable by the browser's Ctrl + F functionality.
+    // Screen-readers will still read the description for elements with aria-describedby even
+    // when the description element is not visible.
 
 
-  _deleteMessagesContainer() {
-    if (messagesContainer) {
-      messagesContainer.remove();
-      messagesContainer = null;
+    messagesContainer.style.visibility = 'hidden'; // Even though we use `visibility: hidden`, we still apply `cdk-visually-hidden` so that
+    // the description element doesn't impact page layout.
+
+    messagesContainer.classList.add(containerClassName);
+    messagesContainer.classList.add('cdk-visually-hidden'); // @breaking-change 14.0.0 Remove null check for `_platform`.
+
+    if (this._platform && !this._platform.isBrowser) {
+      messagesContainer.setAttribute('platform', 'server');
     }
+
+    this._document.body.appendChild(messagesContainer);
+
+    this._messagesContainer = messagesContainer;
   }
   /** Removes all cdk-describedby messages that are hosted through the element. */
 
@@ -16389,11 +16604,12 @@ class AriaDescriber {
 
 
   _addMessageReference(element, key) {
-    const registeredMessage = messageRegistry.get(key); // Add the aria-describedby reference and set the
+    const registeredMessage = this._messageRegistry.get(key); // Add the aria-describedby reference and set the
     // describedby_host attribute to mark the element.
 
+
     addAriaReferencedId(element, 'aria-describedby', registeredMessage.messageElement.id);
-    element.setAttribute(CDK_DESCRIBEDBY_HOST_ATTRIBUTE, '');
+    element.setAttribute(CDK_DESCRIBEDBY_HOST_ATTRIBUTE, this._id);
     registeredMessage.referenceCount++;
   }
   /**
@@ -16403,7 +16619,8 @@ class AriaDescriber {
 
 
   _removeMessageReference(element, key) {
-    const registeredMessage = messageRegistry.get(key);
+    const registeredMessage = this._messageRegistry.get(key);
+
     registeredMessage.referenceCount--;
     removeAriaReferencedId(element, 'aria-describedby', registeredMessage.messageElement.id);
     element.removeAttribute(CDK_DESCRIBEDBY_HOST_ATTRIBUTE);
@@ -16413,7 +16630,9 @@ class AriaDescriber {
 
   _isElementDescribedByMessage(element, key) {
     const referenceIds = getAriaReferenceIds(element, 'aria-describedby');
-    const registeredMessage = messageRegistry.get(key);
+
+    const registeredMessage = this._messageRegistry.get(key);
+
     const messageId = registeredMessage && registeredMessage.messageElement.id;
     return !!messageId && referenceIds.indexOf(messageId) != -1;
   }
@@ -16448,7 +16667,7 @@ class AriaDescriber {
 }
 
 AriaDescriber.ɵfac = function AriaDescriber_Factory(t) {
-  return new (t || AriaDescriber)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT));
+  return new (t || AriaDescriber)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform));
 };
 
 AriaDescriber.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
@@ -16470,6 +16689,8 @@ AriaDescriber.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
         args: [_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT]
       }]
+    }, {
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform
     }];
   }, null);
 })();
@@ -16507,8 +16728,8 @@ class ListKeyManager {
     this._activeItemIndex = -1;
     this._activeItem = null;
     this._wrap = false;
-    this._letterKeyStream = new rxjs__WEBPACK_IMPORTED_MODULE_2__.Subject();
-    this._typeaheadSubscription = rxjs__WEBPACK_IMPORTED_MODULE_3__.Subscription.EMPTY;
+    this._letterKeyStream = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject();
+    this._typeaheadSubscription = rxjs__WEBPACK_IMPORTED_MODULE_4__.Subscription.EMPTY;
     this._vertical = true;
     this._allowedModifierKeys = [];
     this._homeAndEnd = false;
@@ -16526,10 +16747,10 @@ class ListKeyManager {
      * when focus is shifted off of the list.
      */
 
-    this.tabOut = new rxjs__WEBPACK_IMPORTED_MODULE_2__.Subject();
+    this.tabOut = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject();
     /** Stream that emits whenever the active item of the list manager changes. */
 
-    this.change = new rxjs__WEBPACK_IMPORTED_MODULE_2__.Subject(); // We allow for the items to be an array because, in some cases, the consumer may
+    this.change = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject(); // We allow for the items to be an array because, in some cases, the consumer may
     // not have access to a QueryList of the items they want to manage (e.g. when the
     // items aren't being collected via `ViewChildren` or `ContentChildren`).
 
@@ -16615,7 +16836,7 @@ class ListKeyManager {
     // with that string and select it.
 
 
-    this._typeaheadSubscription = this._letterKeyStream.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.tap)(letter => this._pressedLetters.push(letter)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.debounceTime)(debounceInterval), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.filter)(() => this._pressedLetters.length > 0), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_7__.map)(() => this._pressedLetters.join(''))).subscribe(inputString => {
+    this._typeaheadSubscription = this._letterKeyStream.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_5__.tap)(letter => this._pressedLetters.push(letter)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.debounceTime)(debounceInterval), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_7__.filter)(() => this._pressedLetters.length > 0), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.map)(() => this._pressedLetters.join(''))).subscribe(inputString => {
       const items = this._getItemsArray(); // Start at 1 because we want to start searching at the item immediately
       // following the current active item.
 
@@ -16668,11 +16889,11 @@ class ListKeyManager {
     });
 
     switch (keyCode) {
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.TAB:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.TAB:
         this.tabOut.next();
         return;
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.DOWN_ARROW:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.DOWN_ARROW:
         if (this._vertical && isModifierAllowed) {
           this.setNextItemActive();
           break;
@@ -16680,7 +16901,7 @@ class ListKeyManager {
           return;
         }
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.UP_ARROW:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.UP_ARROW:
         if (this._vertical && isModifierAllowed) {
           this.setPreviousItemActive();
           break;
@@ -16688,7 +16909,7 @@ class ListKeyManager {
           return;
         }
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.RIGHT_ARROW:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.RIGHT_ARROW:
         if (this._horizontal && isModifierAllowed) {
           this._horizontal === 'rtl' ? this.setPreviousItemActive() : this.setNextItemActive();
           break;
@@ -16696,7 +16917,7 @@ class ListKeyManager {
           return;
         }
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.LEFT_ARROW:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.LEFT_ARROW:
         if (this._horizontal && isModifierAllowed) {
           this._horizontal === 'rtl' ? this.setNextItemActive() : this.setPreviousItemActive();
           break;
@@ -16704,7 +16925,7 @@ class ListKeyManager {
           return;
         }
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.HOME:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.HOME:
         if (this._homeAndEnd && isModifierAllowed) {
           this.setFirstItemActive();
           break;
@@ -16712,7 +16933,7 @@ class ListKeyManager {
           return;
         }
 
-      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.END:
+      case _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.END:
         if (this._homeAndEnd && isModifierAllowed) {
           this.setLastItemActive();
           break;
@@ -16721,12 +16942,12 @@ class ListKeyManager {
         }
 
       default:
-        if (isModifierAllowed || (0,_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.hasModifierKey)(event, 'shiftKey')) {
+        if (isModifierAllowed || (0,_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.hasModifierKey)(event, 'shiftKey')) {
           // Attempt to use the `event.key` which also maps it to the user's keyboard language,
           // otherwise fall back to resolving alphanumeric characters via the keyCode.
           if (event.key && event.key.length === 1) {
             this._letterKeyStream.next(event.key.toLocaleUpperCase());
-          } else if (keyCode >= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.A && keyCode <= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.Z || keyCode >= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.ZERO && keyCode <= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.NINE) {
+          } else if (keyCode >= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.A && keyCode <= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.Z || keyCode >= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.ZERO && keyCode <= _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.NINE) {
             this._letterKeyStream.next(String.fromCharCode(keyCode));
           }
         } // Note that we return here, in order to avoid preventing
@@ -17074,7 +17295,7 @@ class InteractivityChecker {
 }
 
 InteractivityChecker.ɵfac = function InteractivityChecker_Factory(t) {
-  return new (t || InteractivityChecker)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform));
+  return new (t || InteractivityChecker)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform));
 };
 
 InteractivityChecker.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
@@ -17091,7 +17312,7 @@ InteractivityChecker.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MOD
     }]
   }], function () {
     return [{
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform
     }];
   }, null);
 })();
@@ -17678,7 +17899,7 @@ class CdkTrapFocus {
   }
 
   _captureFocus() {
-    this._previouslyFocusedElement = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getFocusedElementPierceShadowDom)();
+    this._previouslyFocusedElement = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getFocusedElementPierceShadowDom)();
     this.focusTrap.focusInitialElementWhenReady();
   }
 
@@ -18052,10 +18273,12 @@ ConfigurableFocusTrapFactory.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPO
 function isFakeMousedownFromScreenReader(event) {
   // Some screen readers will dispatch a fake `mousedown` event when pressing enter or space on
   // a clickable element. We can distinguish these events when both `offsetX` and `offsetY` are
-  // zero. Note that there's an edge case where the user could click the 0x0 spot of the screen
-  // themselves, but that is unlikely to contain interaction elements. Historically we used to
-  // check `event.buttons === 0`, however that no longer works on recent versions of NVDA.
-  return event.offsetX === 0 && event.offsetY === 0;
+  // zero or `event.buttons` is zero, depending on the browser:
+  // - `event.buttons` works on Firefox, but fails on Chrome.
+  // - `offsetX` and `offsetY` work on Chrome, but fail on Firefox.
+  // Note that there's an edge case where the user could click the 0x0 spot of the
+  // screen themselves, but that is unlikely to contain interactive elements.
+  return event.buttons === 0 || event.offsetX === 0 && event.offsetY === 0;
 }
 /** Gets whether an event could be a faked `touchstart` event dispatched by a screen reader. */
 
@@ -18101,7 +18324,7 @@ const INPUT_MODALITY_DETECTOR_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODU
  */
 
 const INPUT_MODALITY_DETECTOR_DEFAULT_OPTIONS = {
-  ignoreKeys: [_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.ALT, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.CONTROL, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.MAC_META, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.META, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_8__.SHIFT]
+  ignoreKeys: [_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.ALT, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.CONTROL, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.MAC_META, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.META, _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_9__.SHIFT]
 };
 /**
  * The amount of time needed to pass after a touchstart event in order for a subsequent mousedown
@@ -18117,7 +18340,7 @@ const TOUCH_BUFFER_MS = 650;
  * supports it.
  */
 
-const modalityEventListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.normalizePassiveListenerOptions)({
+const modalityEventListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.normalizePassiveListenerOptions)({
   passive: true,
   capture: true
 });
@@ -18170,7 +18393,7 @@ class InputModalityDetector {
 
       this._modality.next('keyboard');
 
-      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getEventTarget)(event);
+      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getEventTarget)(event);
     };
     /**
      * Handles mousedown events. Must be an arrow function in order to preserve the context when it
@@ -18190,7 +18413,7 @@ class InputModalityDetector {
 
       this._modality.next(isFakeMousedownFromScreenReader(event) ? 'keyboard' : 'mouse');
 
-      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getEventTarget)(event);
+      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getEventTarget)(event);
     };
     /**
      * Handles touchstart events. Must be an arrow function in order to preserve the context when it
@@ -18213,7 +18436,7 @@ class InputModalityDetector {
 
       this._modality.next('touch');
 
-      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getEventTarget)(event);
+      this._mostRecentTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getEventTarget)(event);
     };
 
     this._options = Object.assign(Object.assign({}, INPUT_MODALITY_DETECTOR_DEFAULT_OPTIONS), options); // Skip the first emission as it's null.
@@ -18250,7 +18473,7 @@ class InputModalityDetector {
 }
 
 InputModalityDetector.ɵfac = function InputModalityDetector_Factory(t) {
-  return new (t || InputModalityDetector)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](INPUT_MODALITY_DETECTOR_OPTIONS, 8));
+  return new (t || InputModalityDetector)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](INPUT_MODALITY_DETECTOR_OPTIONS, 8));
 };
 
 InputModalityDetector.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
@@ -18267,7 +18490,7 @@ InputModalityDetector.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MO
     }]
   }], function () {
     return [{
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform
     }, {
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone
     }, {
@@ -18352,17 +18575,23 @@ class LiveAnnouncer {
 
 
     return this._ngZone.runOutsideAngular(() => {
-      return new Promise(resolve => {
-        clearTimeout(this._previousTimeout);
-        this._previousTimeout = setTimeout(() => {
-          this._liveElement.textContent = message;
-          resolve();
+      if (!this._currentPromise) {
+        this._currentPromise = new Promise(resolve => this._currentResolve = resolve);
+      }
 
-          if (typeof duration === 'number') {
-            this._previousTimeout = setTimeout(() => this.clear(), duration);
-          }
-        }, 100);
-      });
+      clearTimeout(this._previousTimeout);
+      this._previousTimeout = setTimeout(() => {
+        this._liveElement.textContent = message;
+
+        if (typeof duration === 'number') {
+          this._previousTimeout = setTimeout(() => this.clear(), duration);
+        }
+
+        this._currentResolve();
+
+        this._currentPromise = this._currentResolve = undefined;
+      }, 100);
+      return this._currentPromise;
     });
   }
   /**
@@ -18379,11 +18608,13 @@ class LiveAnnouncer {
   }
 
   ngOnDestroy() {
-    var _a;
+    var _a, _b;
 
     clearTimeout(this._previousTimeout);
     (_a = this._liveElement) === null || _a === void 0 ? void 0 : _a.remove();
     this._liveElement = null;
+    (_b = this._currentResolve) === null || _b === void 0 ? void 0 : _b.call(this);
+    this._currentPromise = this._currentResolve = undefined;
   }
 
   _createLiveElement() {
@@ -18563,7 +18794,7 @@ const FOCUS_MONITOR_DEFAULT_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODULE
  * mark the listener as passive if the browser supports it.
  */
 
-const captureEventListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.normalizePassiveListenerOptions)({
+const captureEventListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.normalizePassiveListenerOptions)({
   passive: true,
   capture: true
 });
@@ -18611,19 +18842,19 @@ class FocusMonitor {
       // Make a note of when the window regains focus, so we can
       // restore the origin info for the focused element.
       this._windowFocused = true;
-      this._windowFocusTimeoutId = setTimeout(() => this._windowFocused = false);
+      this._windowFocusTimeoutId = window.setTimeout(() => this._windowFocused = false);
     };
     /** Subject for stopping our InputModalityDetector subscription. */
 
 
-    this._stopInputModalityDetector = new rxjs__WEBPACK_IMPORTED_MODULE_2__.Subject();
+    this._stopInputModalityDetector = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject();
     /**
      * Event listener for `focus` and 'blur' events on the document.
      * Needs to be an arrow function in order to preserve the context when it gets bound.
      */
 
     this._rootNodeFocusAndBlurListener = event => {
-      const target = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getEventTarget)(event);
+      const target = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getEventTarget)(event);
 
       const handler = event.type === 'focus' ? this._onFocus : this._onBlur; // We need to walk up the ancestor chain in order to support `checkChildren`.
 
@@ -18648,7 +18879,7 @@ class FocusMonitor {
     // to the `document`, if focus is moving within the same shadow root.
 
 
-    const rootNode = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getShadowRoot)(nativeElement) || this._getDocument();
+    const rootNode = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getShadowRoot)(nativeElement) || this._getDocument();
 
     const cachedInfo = this._elementInfo.get(nativeElement); // Check if we're already monitoring this element.
 
@@ -18667,7 +18898,7 @@ class FocusMonitor {
 
     const info = {
       checkChildren: checkChildren,
-      subject: new rxjs__WEBPACK_IMPORTED_MODULE_2__.Subject(),
+      subject: new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject(),
       rootNode
     };
 
@@ -18836,7 +19067,7 @@ class FocusMonitor {
     // monitored element itself.
     const elementInfo = this._elementInfo.get(element);
 
-    const focusEventTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__._getEventTarget)(event);
+    const focusEventTarget = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__._getEventTarget)(event);
 
     if (!elementInfo || !elementInfo.checkChildren && element !== focusEventTarget) {
       return;
@@ -18966,7 +19197,7 @@ class FocusMonitor {
 }
 
 FocusMonitor.ɵfac = function FocusMonitor_Factory(t) {
-  return new (t || FocusMonitor)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](InputModalityDetector), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](FOCUS_MONITOR_DEFAULT_OPTIONS, 8));
+  return new (t || FocusMonitor)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](InputModalityDetector), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](FOCUS_MONITOR_DEFAULT_OPTIONS, 8));
 };
 
 FocusMonitor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
@@ -18985,7 +19216,7 @@ FocusMonitor.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__[
     return [{
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone
     }, {
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform
     }, {
       type: InputModalityDetector
     }, {
@@ -19172,7 +19403,7 @@ class HighContrastModeDetector {
 }
 
 HighContrastModeDetector.ɵfac = function HighContrastModeDetector_Factory(t) {
-  return new (t || HighContrastModeDetector)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT));
+  return new (t || HighContrastModeDetector)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_1__.DOCUMENT));
 };
 
 HighContrastModeDetector.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
@@ -19189,7 +19420,7 @@ HighContrastModeDetector.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED
     }]
   }], function () {
     return [{
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_2__.Platform
     }, {
       type: undefined,
       decorators: [{
@@ -19223,14 +19454,14 @@ A11yModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵ
   type: A11yModule
 });
 A11yModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({
-  imports: [[_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.PlatformModule, _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_15__.ObserversModule]]
+  imports: [[_angular_cdk_observers__WEBPACK_IMPORTED_MODULE_15__.ObserversModule]]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](A11yModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.PlatformModule, _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_15__.ObserversModule],
+      imports: [_angular_cdk_observers__WEBPACK_IMPORTED_MODULE_15__.ObserversModule],
       declarations: [CdkAriaLive, CdkTrapFocus, CdkMonitorFocus],
       exports: [CdkAriaLive, CdkTrapFocus, CdkMonitorFocus]
     }]
@@ -19584,7 +19815,7 @@ __webpack_require__.r(__webpack_exports__);
  * found in the LICENSE file at https://angular.io/license
  */
 /** Current version of the Angular Component Development Kit. */
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.3.9');
 
 /**
  * @license
@@ -22047,6 +22278,10 @@ class OverlayRef {
     this._locationChanges = rxjs__WEBPACK_IMPORTED_MODULE_6__.Subscription.EMPTY;
 
     this._backdropClickHandler = event => this._backdropClick.next(event);
+
+    this._backdropTransitionendHandler = event => {
+      this._disposeBackdrop(event.target);
+    };
     /** Stream of keydown events dispatched to this overlay. */
 
 
@@ -22095,12 +22330,13 @@ class OverlayRef {
 
 
   attach(portal) {
-    let attachResult = this._portalOutlet.attach(portal); // Update the pane element with the given configuration.
-
-
+    // Insert the host into the DOM before attaching the portal, otherwise
+    // the animations module will skip animations on repeat attachments.
     if (!this._host.parentElement && this._previousHostParent) {
       this._previousHostParent.appendChild(this._host);
     }
+
+    const attachResult = this._portalOutlet.attach(portal);
 
     if (this._positionStrategy) {
       this._positionStrategy.attach(this);
@@ -22455,28 +22691,10 @@ class OverlayRef {
       return;
     }
 
-    let timeoutId;
-
-    const finishDetach = () => {
-      // It may not be attached to anything in certain cases (e.g. unit tests).
-      if (backdropToDetach) {
-        backdropToDetach.removeEventListener('click', this._backdropClickHandler);
-        backdropToDetach.removeEventListener('transitionend', finishDetach);
-
-        this._disposeBackdrop(backdropToDetach);
-      }
-
-      if (this._config.backdropClass) {
-        this._toggleClasses(backdropToDetach, this._config.backdropClass, false);
-      }
-
-      clearTimeout(timeoutId);
-    };
-
     backdropToDetach.classList.remove('cdk-overlay-backdrop-showing');
 
     this._ngZone.runOutsideAngular(() => {
-      backdropToDetach.addEventListener('transitionend', finishDetach);
+      backdropToDetach.addEventListener('transitionend', this._backdropTransitionendHandler);
     }); // If the backdrop doesn't have a transition, the `transitionend` event won't fire.
     // In this case we make it unclickable and we try to remove it after a delay.
 
@@ -22485,7 +22703,9 @@ class OverlayRef {
     // If it were to run inside the Angular zone, every test that used Overlay would have to be
     // either async or fakeAsync.
 
-    timeoutId = this._ngZone.runOutsideAngular(() => setTimeout(finishDetach, 500));
+    this._backdropTimeout = this._ngZone.runOutsideAngular(() => setTimeout(() => {
+      this._disposeBackdrop(backdropToDetach);
+    }, 500));
   }
   /** Toggles a single CSS class or an array of classes on an element. */
 
@@ -22546,6 +22766,8 @@ class OverlayRef {
 
   _disposeBackdrop(backdrop) {
     if (backdrop) {
+      backdrop.removeEventListener('click', this._backdropClickHandler);
+      backdrop.removeEventListener('transitionend', this._backdropTransitionendHandler);
       backdrop.remove(); // It is possible that a new portal has been attached to this overlay since we started
       // removing the backdrop. If that is the case, only clear the backdrop reference if it
       // is still the same instance that we started to remove.
@@ -22553,6 +22775,11 @@ class OverlayRef {
       if (this._backdropElement === backdrop) {
         this._backdropElement = null;
       }
+    }
+
+    if (this._backdropTimeout) {
+      clearTimeout(this._backdropTimeout);
+      this._backdropTimeout = undefined;
     }
   }
 
@@ -22817,7 +23044,7 @@ class FlexibleConnectedPositionStrategy {
 
     this._resetOverlayElementStyles();
 
-    this._resetBoundingBoxStyles(); // We need the bounding rects for the origin and the overlay to determine how to position
+    this._resetBoundingBoxStyles(); // We need the bounding rects for the origin, the overlay and the container to determine how to position
     // the overlay relative to the origin.
     // We use the viewport rect to determine whether a position would go off-screen.
 
@@ -22825,9 +23052,11 @@ class FlexibleConnectedPositionStrategy {
     this._viewportRect = this._getNarrowedViewportRect();
     this._originRect = this._getOriginRect();
     this._overlayRect = this._pane.getBoundingClientRect();
+    this._containerRect = this._overlayContainer.getContainerElement().getBoundingClientRect();
     const originRect = this._originRect;
     const overlayRect = this._overlayRect;
-    const viewportRect = this._viewportRect; // Positions where the overlay will fit with flexible dimensions.
+    const viewportRect = this._viewportRect;
+    const containerRect = this._containerRect; // Positions where the overlay will fit with flexible dimensions.
 
     const flexibleFits = []; // Fallback if none of the preferred positions fit within the viewport.
 
@@ -22836,7 +23065,7 @@ class FlexibleConnectedPositionStrategy {
 
     for (let pos of this._preferredPositions) {
       // Get the exact (x, y) coordinate for the point-of-origin on the origin element.
-      let originPoint = this._getOriginPoint(originRect, pos); // From that point-of-origin, get the exact (x, y) coordinate for the top-left corner of the
+      let originPoint = this._getOriginPoint(originRect, containerRect, pos); // From that point-of-origin, get the exact (x, y) coordinate for the top-left corner of the
       // overlay in this position. We use the top-left corner for calculations and later translate
       // this into an appropriate (top, left, bottom, right) style.
 
@@ -22975,15 +23204,23 @@ class FlexibleConnectedPositionStrategy {
 
 
   reapplyLastPosition() {
-    if (!this._isDisposed && (!this._platform || this._platform.isBrowser)) {
+    if (this._isDisposed || !this._platform.isBrowser) {
+      return;
+    }
+
+    const lastPosition = this._lastPosition;
+
+    if (lastPosition) {
       this._originRect = this._getOriginRect();
       this._overlayRect = this._pane.getBoundingClientRect();
       this._viewportRect = this._getNarrowedViewportRect();
-      const lastPosition = this._lastPosition || this._preferredPositions[0];
+      this._containerRect = this._overlayContainer.getContainerElement().getBoundingClientRect();
 
-      const originPoint = this._getOriginPoint(this._originRect, lastPosition);
+      const originPoint = this._getOriginPoint(this._originRect, this._containerRect, lastPosition);
 
       this._applyPosition(lastPosition, originPoint);
+    } else {
+      this.apply();
     }
   }
   /**
@@ -23110,7 +23347,7 @@ class FlexibleConnectedPositionStrategy {
    */
 
 
-  _getOriginPoint(originRect, pos) {
+  _getOriginPoint(originRect, containerRect, pos) {
     let x;
 
     if (pos.originX == 'center') {
@@ -23121,6 +23358,12 @@ class FlexibleConnectedPositionStrategy {
       const startX = this._isRtl() ? originRect.right : originRect.left;
       const endX = this._isRtl() ? originRect.left : originRect.right;
       x = pos.originX == 'start' ? startX : endX;
+    } // When zooming in Safari the container rectangle contains negative values for the position
+    // and we need to re-add them to the calculated coordinates.
+
+
+    if (containerRect.left < 0) {
+      x -= containerRect.left;
     }
 
     let y;
@@ -23129,6 +23372,15 @@ class FlexibleConnectedPositionStrategy {
       y = originRect.top + originRect.height / 2;
     } else {
       y = pos.originY == 'top' ? originRect.top : originRect.bottom;
+    } // Normally the containerRect's top value would be zero, however when the overlay is attached to an input
+    // (e.g. in an autocomplete), mobile browsers will shift everything in order to put the input in the middle
+    // of the screen and to make space for the virtual keyboard. We need to account for this offset,
+    // otherwise our positioning will be thrown off.
+    // Additionally, when zooming in Safari this fixes the vertical position.
+
+
+    if (containerRect.top < 0) {
+      y -= containerRect.top;
     }
 
     return {
@@ -23215,7 +23467,7 @@ class FlexibleConnectedPositionStrategy {
   /**
    * Whether the overlay can fit within the viewport when it may resize either its width or height.
    * @param fit How well the overlay fits in the viewport at some position.
-   * @param point The (x, y) coordinates of the overlat at some position.
+   * @param point The (x, y) coordinates of the overlay at some position.
    * @param viewport The geometry of the viewport.
    */
 
@@ -23239,7 +23491,7 @@ class FlexibleConnectedPositionStrategy {
    * right and bottom).
    *
    * @param start Starting point from which the overlay is pushed.
-   * @param overlay Dimensions of the overlay.
+   * @param rawOverlayRect Dimensions of the overlay.
    * @param scrollPosition Current viewport scroll position.
    * @returns The point at which to position the overlay after pushing. This is effectively a new
    *     originPoint.
@@ -23596,16 +23848,9 @@ class FlexibleConnectedPositionStrategy {
 
     if (this._isPushed) {
       overlayPoint = this._pushOverlayOnScreen(overlayPoint, this._overlayRect, scrollPosition);
-    }
-
-    let virtualKeyboardOffset = this._overlayContainer.getContainerElement().getBoundingClientRect().top; // Normally this would be zero, however when the overlay is attached to an input (e.g. in an
-    // autocomplete), mobile browsers will shift everything in order to put the input in the middle
-    // of the screen and to make space for the virtual keyboard. We need to account for this offset,
-    // otherwise our positioning will be thrown off.
-
-
-    overlayPoint.y -= virtualKeyboardOffset; // We want to set either `top` or `bottom` based on whether the overlay wants to appear
+    } // We want to set either `top` or `bottom` based on whether the overlay wants to appear
     // above or below the origin and the direction in which the element will expand.
+
 
     if (position.overlayY === 'bottom') {
       // When using `bottom`, we adjust the y position such that it is the distance
@@ -24250,8 +24495,11 @@ BaseOverlayDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MO
 
 
 class OverlayKeyboardDispatcher extends BaseOverlayDispatcher {
-  constructor(document) {
+  constructor(document,
+  /** @breaking-change 14.0.0 _ngZone will be required. */
+  _ngZone) {
     super(document);
+    this._ngZone = _ngZone;
     /** Keyboard event listener that will be attached to the body. */
 
     this._keydownListener = event => {
@@ -24265,7 +24513,14 @@ class OverlayKeyboardDispatcher extends BaseOverlayDispatcher {
         // because we don't want overlays that don't handle keyboard events to block the ones below
         // them that do.
         if (overlays[i]._keydownEvents.observers.length > 0) {
-          overlays[i]._keydownEvents.next(event);
+          const keydownEvents = overlays[i]._keydownEvents;
+          /** @breaking-change 14.0.0 _ngZone will be required. */
+
+          if (this._ngZone) {
+            this._ngZone.run(() => keydownEvents.next(event));
+          } else {
+            keydownEvents.next(event);
+          }
 
           break;
         }
@@ -24279,7 +24534,12 @@ class OverlayKeyboardDispatcher extends BaseOverlayDispatcher {
     super.add(overlayRef); // Lazily start dispatcher once first overlay is added
 
     if (!this._isAttached) {
-      this._document.body.addEventListener('keydown', this._keydownListener);
+      /** @breaking-change 14.0.0 _ngZone will be required. */
+      if (this._ngZone) {
+        this._ngZone.runOutsideAngular(() => this._document.body.addEventListener('keydown', this._keydownListener));
+      } else {
+        this._document.body.addEventListener('keydown', this._keydownListener);
+      }
 
       this._isAttached = true;
     }
@@ -24298,7 +24558,7 @@ class OverlayKeyboardDispatcher extends BaseOverlayDispatcher {
 }
 
 OverlayKeyboardDispatcher.ɵfac = function OverlayKeyboardDispatcher_Factory(t) {
-  return new (t || OverlayKeyboardDispatcher)(_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT));
+  return new (t || OverlayKeyboardDispatcher)(_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_3__.NgZone, 8));
 };
 
 OverlayKeyboardDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵdefineInjectable"]({
@@ -24320,6 +24580,11 @@ OverlayKeyboardDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTE
         type: _angular_core__WEBPACK_IMPORTED_MODULE_3__.Inject,
         args: [_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT]
       }]
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_3__.NgZone,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_3__.Optional
+      }]
     }];
   }, null);
 })();
@@ -24339,9 +24604,12 @@ OverlayKeyboardDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTE
 
 
 class OverlayOutsideClickDispatcher extends BaseOverlayDispatcher {
-  constructor(document, _platform) {
+  constructor(document, _platform,
+  /** @breaking-change 14.0.0 _ngZone will be required. */
+  _ngZone) {
     super(document);
     this._platform = _platform;
+    this._ngZone = _ngZone;
     this._cursorStyleIsSet = false;
     /** Store pointerdown event target to track origin of click. */
 
@@ -24387,7 +24655,14 @@ class OverlayOutsideClickDispatcher extends BaseOverlayDispatcher {
           break;
         }
 
-        overlayRef._outsidePointerEvents.next(event);
+        const outsidePointerEvents = overlayRef._outsidePointerEvents;
+        /** @breaking-change 14.0.0 _ngZone will be required. */
+
+        if (this._ngZone) {
+          this._ngZone.run(() => outsidePointerEvents.next(event));
+        } else {
+          outsidePointerEvents.next(event);
+        }
       }
     };
   }
@@ -24404,11 +24679,15 @@ class OverlayOutsideClickDispatcher extends BaseOverlayDispatcher {
 
     if (!this._isAttached) {
       const body = this._document.body;
-      body.addEventListener('pointerdown', this._pointerDownListener, true);
-      body.addEventListener('click', this._clickListener, true);
-      body.addEventListener('auxclick', this._clickListener, true);
-      body.addEventListener('contextmenu', this._clickListener, true); // click event is not fired on iOS. To make element "clickable" we are
+      /** @breaking-change 14.0.0 _ngZone will be required. */
+
+      if (this._ngZone) {
+        this._ngZone.runOutsideAngular(() => this._addEventListeners(body));
+      } else {
+        this._addEventListeners(body);
+      } // click event is not fired on iOS. To make element "clickable" we are
       // setting the cursor to pointer
+
 
       if (this._platform.IOS && !this._cursorStyleIsSet) {
         this._cursorOriginalValue = body.style.cursor;
@@ -24439,10 +24718,17 @@ class OverlayOutsideClickDispatcher extends BaseOverlayDispatcher {
     }
   }
 
+  _addEventListeners(body) {
+    body.addEventListener('pointerdown', this._pointerDownListener, true);
+    body.addEventListener('click', this._clickListener, true);
+    body.addEventListener('auxclick', this._clickListener, true);
+    body.addEventListener('contextmenu', this._clickListener, true);
+  }
+
 }
 
 OverlayOutsideClickDispatcher.ɵfac = function OverlayOutsideClickDispatcher_Factory(t) {
-  return new (t || OverlayOutsideClickDispatcher)(_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform));
+  return new (t || OverlayOutsideClickDispatcher)(_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT), _angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_3__.NgZone, 8));
 };
 
 OverlayOutsideClickDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_3__["ɵɵdefineInjectable"]({
@@ -24466,6 +24752,11 @@ OverlayOutsideClickDispatcher.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMP
       }]
     }, {
       type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_3__.NgZone,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_3__.Optional
+      }]
     }];
   }, null);
 })();
@@ -26156,6 +26447,17 @@ class BasePortalHost extends BasePortalOutlet {}
 
 
 class DomPortalOutlet extends BasePortalOutlet {
+  /**
+   * @param outletElement Element into which the content is projected.
+   * @param _componentFactoryResolver Used to resolve the component factory.
+   *   Only required when attaching component portals.
+   * @param _appRef Reference to the application. Only used in component portals when there
+   *   is no `ViewContainerRef` available.
+   * @param _defaultInjector Injector to use as a fallback when the portal being attached doesn't
+   *   have one. Only used for component portals.
+   * @param _document Reference to the document. Used when attaching a DOM portal. Will eventually
+   *   become a required parameter.
+   */
   constructor(
   /** Element into which the content is projected. */
   outletElement, _componentFactoryResolver, _appRef, _defaultInjector,
@@ -26215,6 +26517,11 @@ class DomPortalOutlet extends BasePortalOutlet {
 
   attachComponentPortal(portal) {
     const resolver = portal.componentFactoryResolver || this._componentFactoryResolver;
+
+    if ((typeof ngDevMode === 'undefined' || ngDevMode) && !resolver) {
+      throw Error('Cannot attach component portal to outlet without a ComponentFactoryResolver.');
+    }
+
     const componentFactory = resolver.resolveComponentFactory(portal.component);
     let componentRef; // If the portal specifies a ViewContainerRef, we will use that as the attachment point
     // for the component (in terms of Angular's component tree, not rendering).
@@ -26225,12 +26532,20 @@ class DomPortalOutlet extends BasePortalOutlet {
       componentRef = portal.viewContainerRef.createComponent(componentFactory, portal.viewContainerRef.length, portal.injector || portal.viewContainerRef.injector);
       this.setDisposeFn(() => componentRef.destroy());
     } else {
-      componentRef = componentFactory.create(portal.injector || this._defaultInjector);
+      if ((typeof ngDevMode === 'undefined' || ngDevMode) && !this._appRef) {
+        throw Error('Cannot attach component portal to outlet without an ApplicationRef.');
+      }
+
+      componentRef = componentFactory.create(portal.injector || this._defaultInjector || _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injector.NULL);
 
       this._appRef.attachView(componentRef.hostView);
 
       this.setDisposeFn(() => {
-        this._appRef.detachView(componentRef.hostView);
+        // Verify that the ApplicationRef has registered views before trying to detach a host view.
+        // This check also protects the `detachView` from being called on a destroyed ApplicationRef.
+        if (this._appRef.viewCount > 0) {
+          this._appRef.detachView(componentRef.hostView);
+        }
 
         componentRef.destroy();
       });
@@ -27940,7 +28255,9 @@ class CdkVirtualScrollViewport extends CdkScrollable {
     const isHorizontal = this.orientation == 'horizontal';
     const axis = isHorizontal ? 'X' : 'Y';
     const axisDirection = isHorizontal && isRtl ? -1 : 1;
-    let transform = `translate${axis}(${Number(axisDirection * offset)}px)`;
+    let transform = `translate${axis}(${Number(axisDirection * offset)}px)`; // in appendOnly, we always start from the top
+
+    offset = this.appendOnly && to === 'to-start' ? 0 : offset;
     this._renderedContentOffset = offset;
 
     if (to === 'to-end') {
@@ -28293,7 +28610,10 @@ class CdkVirtualForOf {
 
     this._viewport.renderedRangeStream.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_11__.takeUntil)(this._destroyed)).subscribe(range => {
       this._renderedRange = range;
-      ngZone.run(() => this.viewChange.next(this._renderedRange));
+
+      if (this.viewChange.observers.length) {
+        ngZone.run(() => this.viewChange.next(this._renderedRange));
+      }
 
       this._onRenderedDataChange();
     });
@@ -28650,14 +28970,14 @@ ScrollingModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0_
   type: ScrollingModule
 });
 ScrollingModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({
-  imports: [[_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.PlatformModule, CdkScrollableModule], _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, CdkScrollableModule]
+  imports: [[_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, CdkScrollableModule], _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, CdkScrollableModule]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](ScrollingModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_9__.PlatformModule, CdkScrollableModule],
+      imports: [_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, CdkScrollableModule],
       exports: [_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.BidiModule, CdkScrollableModule, CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport],
       declarations: [CdkFixedSizeVirtualScroll, CdkVirtualForOf, CdkVirtualScrollViewport]
     }]
@@ -28976,7 +29296,12 @@ class CdkTextareaAutosize {
 
   set placeholder(value) {
     this._cachedPlaceholderHeight = undefined;
-    this._textareaElement.placeholder = value;
+
+    if (value) {
+      this._textareaElement.setAttribute('placeholder', value);
+    } else {
+      this._textareaElement.removeAttribute('placeholder');
+    }
 
     this._cacheTextareaPlaceholderHeight();
   }
@@ -29316,16 +29641,13 @@ TextFieldModule.ɵfac = function TextFieldModule_Factory(t) {
 TextFieldModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineNgModule"]({
   type: TextFieldModule
 });
-TextFieldModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjector"]({
-  imports: [[_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.PlatformModule]]
-});
+TextFieldModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵɵdefineInjector"]({});
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_4__["ɵsetClassMetadata"](TextFieldModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_4__.NgModule,
     args: [{
       declarations: [CdkAutofill, CdkTextareaAutosize],
-      imports: [_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.PlatformModule],
       exports: [CdkAutofill, CdkTextareaAutosize]
     }]
   }], null, null);
@@ -29454,8 +29776,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -34156,8 +34478,8 @@ NgSwitchDefault.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0_
 })();
 
 function throwNgSwitchProviderNotFoundError(attrName, directiveName) {
-  throw new _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵRuntimeError"]("305"
-  /* TEMPLATE_STRUCTURE_ERROR */
+  throw new _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵRuntimeError"](2000
+  /* PARENT_NG_SWITCH_NOT_FOUND */
   , `An element with the "${attrName}" attribute ` + `(matching the "${directiveName}" directive) must be located inside an element with the "ngSwitch" attribute ` + `(matching "NgSwitch" directive)`);
 }
 /**
@@ -34584,7 +34906,10 @@ const COMMON_DIRECTIVES = [NgClass, NgComponentOutlet, NgForOf, NgIf, NgTemplate
  */
 
 function invalidPipeArgumentError(type, value) {
-  return Error(`InvalidPipeArgument: '${value}' for pipe '${(0,_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵstringify"])(type)}'`);
+  const errorMessage = typeof ngDevMode === 'undefined' || ngDevMode ? `InvalidPipeArgument: '${value}' for pipe '${(0,_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵstringify"])(type)}'` : '';
+  return new _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵRuntimeError"](2100
+  /* INVALID_PIPE_ARGUMENT */
+  , errorMessage);
 }
 /**
  * @license
@@ -36052,7 +36377,7 @@ function isPlatformWorkerUi(platformId) {
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.3');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -36401,8 +36726,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs/operators */ 116);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs/operators */ 635);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -39563,8 +39888,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 6646);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 1203);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -39705,7 +40030,7 @@ function isForwardRef(fn) {
  *
  * Keep the files below in full sync:
  *  - packages/compiler-cli/src/ngtsc/diagnostics/src/error_details_base_url.ts
- *  - packages/core/src/render3/error_details_base_url.ts
+ *  - packages/core/src/error_details_base_url.ts
  */
 const ERROR_DETAILS_PAGE_BASE_URL = 'https://angular.io/errors';
 
@@ -39722,30 +40047,15 @@ class RuntimeError extends Error {
         this.code = code;
     }
 }
-// Contains a set of error messages that have details guides at angular.io.
-// Full list of available error guides can be found at https://angular.io/errors
-/* tslint:disable:no-toplevel-property-access */
-const RUNTIME_ERRORS_WITH_GUIDES = new Set([
-    "100" /* EXPRESSION_CHANGED_AFTER_CHECKED */,
-    "200" /* CYCLIC_DI_DEPENDENCY */,
-    "201" /* PROVIDER_NOT_FOUND */,
-    "300" /* MULTIPLE_COMPONENTS_MATCH */,
-    "301" /* EXPORT_NOT_FOUND */,
-    "302" /* PIPE_NOT_FOUND */,
-]);
-/* tslint:enable:no-toplevel-property-access */
 /** Called to format a runtime error */
 function formatRuntimeError(code, message) {
-    const fullCode = code ? `NG0${code}: ` : '';
-    let errorMessage = `${fullCode}${message}`;
-    // Some runtime errors are still thrown without `ngDevMode` (for example
-    // `throwProviderNotFoundError`), so we add `ngDevMode` check here to avoid pulling
-    // `RUNTIME_ERRORS_WITH_GUIDES` symbol into prod bundles.
-    // TODO: revisit all instances where `RuntimeError` is thrown and see if `ngDevMode` can be added
-    // there instead to tree-shake more devmode-only code (and eventually remove `ngDevMode` check
-    // from this code).
-    if (ngDevMode && RUNTIME_ERRORS_WITH_GUIDES.has(code)) {
-        errorMessage = `${errorMessage}. Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/NG0${code}`;
+    const codeAsNumber = code;
+    // Error code might be a negative number, which is a special marker that instructs the logic to
+    // generate a link to the error details page on angular.io.
+    const fullCode = `NG0${Math.abs(codeAsNumber)}`;
+    let errorMessage = `${fullCode}${message ? ': ' + message : ''}`;
+    if (ngDevMode && codeAsNumber < 0) {
+        errorMessage = `${errorMessage}. Find more at ${ERROR_DETAILS_PAGE_BASE_URL}/${fullCode}`;
     }
     return errorMessage;
 }
@@ -39786,10 +40096,17 @@ function stringifyForError(value) {
     return renderStringify(value);
 }
 
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
 /** Called when directives inject each other (creating a circular dependency) */
 function throwCyclicDependencyError(token, path) {
     const depPath = path ? `. Dependency path: ${path.join(' > ')} > ${token}` : '';
-    throw new RuntimeError("200" /* CYCLIC_DI_DEPENDENCY */, `Circular dependency in DI detected for ${token}${depPath}`);
+    throw new RuntimeError(-200 /* CYCLIC_DI_DEPENDENCY */, `Circular dependency in DI detected for ${token}${depPath}`);
 }
 function throwMixedMultiProviderError() {
     throw new Error(`Cannot mix multi providers and regular providers`);
@@ -39806,7 +40123,7 @@ function throwInvalidProviderError(ngModuleType, providers, provider) {
 /** Throws an error when a token is not found in DI. */
 function throwProviderNotFoundError(token, injectorName) {
     const injectorDetails = injectorName ? ` in ${injectorName}` : '';
-    throw new RuntimeError("201" /* PROVIDER_NOT_FOUND */, `No provider for ${stringifyForError(token)} found${injectorDetails}`);
+    throw new RuntimeError(-201 /* PROVIDER_NOT_FOUND */, `No provider for ${stringifyForError(token)} found${injectorDetails}`);
 }
 
 /**
@@ -44301,7 +44618,10 @@ function setCurrentInjector(injector) {
 }
 function injectInjectorOnly(token, flags = InjectFlags.Default) {
     if (_currentInjector === undefined) {
-        throw new Error(`inject() must be called from an injection context`);
+        const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+            `inject() must be called from an injection context` :
+            '';
+        throw new RuntimeError(203 /* MISSING_INJECTION_CONTEXT */, errorMessage);
     }
     else if (_currentInjector === null) {
         return injectRootLimpMode(token, undefined, flags);
@@ -44365,7 +44685,10 @@ function injectArgs(types) {
         const arg = resolveForwardRef(types[i]);
         if (Array.isArray(arg)) {
             if (arg.length === 0) {
-                throw new Error('Arguments array must have arguments.');
+                const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                    'Arguments array must have arguments.' :
+                    '';
+                throw new RuntimeError(900 /* INVALID_DIFFER_INPUT */, errorMessage);
             }
             let type = undefined;
             let flags = InjectFlags.Default;
@@ -45562,7 +45885,10 @@ function ɵɵsanitizeResourceUrl(unsafeResourceUrl) {
     if (allowSanitizationBypassAndThrow(unsafeResourceUrl, "ResourceURL" /* ResourceUrl */)) {
         return trustedScriptURLFromStringBypass(unwrapSafeValue(unsafeResourceUrl));
     }
-    throw new Error('unsafe value used in a resource URL context (see https://g.co/ng/security#xss)');
+    const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+        'unsafe value used in a resource URL context (see https://g.co/ng/security#xss)' :
+        '';
+    throw new RuntimeError(904 /* UNSAFE_VALUE_IN_RESOURCE_URL */, errorMessage);
 }
 /**
  * A `script` sanitizer which only lets trusted javascript through.
@@ -45584,7 +45910,10 @@ function ɵɵsanitizeScript(unsafeScript) {
     if (allowSanitizationBypassAndThrow(unsafeScript, "Script" /* Script */)) {
         return trustedScriptFromStringBypass(unwrapSafeValue(unsafeScript));
     }
-    throw new Error('unsafe value used in a script context');
+    const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+        'unsafe value used in a script context' :
+        '';
+    throw new RuntimeError(905 /* UNSAFE_VALUE_IN_SCRIPT */, errorMessage);
 }
 /**
  * A template tag function for promoting the associated constant literal to a
@@ -45672,18 +46001,18 @@ function ɵɵsanitizeUrlOrResourceUrl(unsafeUrl, tag, prop) {
 }
 function validateAgainstEventProperties(name) {
     if (name.toLowerCase().startsWith('on')) {
-        const msg = `Binding to event property '${name}' is disallowed for security reasons, ` +
+        const errorMessage = `Binding to event property '${name}' is disallowed for security reasons, ` +
             `please use (${name.slice(2)})=...` +
             `\nIf '${name}' is a directive input, make sure the directive is imported by the` +
             ` current module.`;
-        throw new Error(msg);
+        throw new RuntimeError(306 /* INVALID_EVENT_BINDING */, errorMessage);
     }
 }
 function validateAgainstEventAttributes(name) {
     if (name.toLowerCase().startsWith('on')) {
-        const msg = `Binding to event attribute '${name}' is disallowed for security reasons, ` +
+        const errorMessage = `Binding to event attribute '${name}' is disallowed for security reasons, ` +
             `please use (${name.slice(2)})=...`;
-        throw new Error(msg);
+        throw new RuntimeError(306 /* INVALID_EVENT_BINDING */, errorMessage);
     }
 }
 function getSanitizer() {
@@ -46003,7 +46332,6 @@ function discoverLocalRefs(lView, nodeIndex) {
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-const ERROR_TYPE = 'ngType';
 const ERROR_ORIGINAL_ERROR = 'ngOriginalError';
 const ERROR_LOGGER = 'ngErrorLogger';
 function wrappedError(message, originalError) {
@@ -46011,17 +46339,6 @@ function wrappedError(message, originalError) {
     const error = Error(msg);
     error[ERROR_ORIGINAL_ERROR] = originalError;
     return error;
-}
-
-/**
- * @license
- * Copyright Google LLC All Rights Reserved.
- *
- * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
- */
-function getType(error) {
-    return error[ERROR_TYPE];
 }
 function getOriginalError(error) {
     return error[ERROR_ORIGINAL_ERROR];
@@ -46267,7 +46584,7 @@ function maybeUnwrapFn(value) {
  */
 /** Called when there are multiple component selectors that match a given node */
 function throwMultipleComponentError(tNode) {
-    throw new RuntimeError("300" /* MULTIPLE_COMPONENTS_MATCH */, `Multiple components match node with tagname ${tNode.value}`);
+    throw new RuntimeError(-300 /* MULTIPLE_COMPONENTS_MATCH */, `Multiple components match node with tagname ${tNode.value}`);
 }
 /** Throws an ExpressionChangedAfterChecked error if checkNoChanges mode is on. */
 function throwErrorIfNoChangesMode(creationMode, oldValue, currValue, propName) {
@@ -46278,9 +46595,7 @@ function throwErrorIfNoChangesMode(creationMode, oldValue, currValue, propName) 
             ` It seems like the view has been created after its parent and its children have been dirty checked.` +
                 ` Has it been created in a change detection hook?`;
     }
-    // TODO: include debug context, see `viewDebugError` function in
-    // `packages/core/src/view/errors.ts` for reference.
-    throw new RuntimeError("100" /* EXPRESSION_CHANGED_AFTER_CHECKED */, msg);
+    throw new RuntimeError(-100 /* EXPRESSION_CHANGED_AFTER_CHECKED */, msg);
 }
 function constructDetailsForInterpolation(lView, rootIndex, expressionIndex, meta, changedValue) {
     const [propName, prefix, ...chunks] = meta.split(INTERPOLATION_DELIMITER);
@@ -49690,7 +50005,7 @@ function matchingSchemas(tView, tagName) {
  */
 function logUnknownPropertyError(propName, tNode) {
     let message = `Can't bind to '${propName}' since it isn't a known property of '${tNode.value}'.`;
-    console.error(formatRuntimeError("303" /* UNKNOWN_BINDING */, message));
+    console.error(formatRuntimeError(303 /* UNKNOWN_BINDING */, message));
 }
 /**
  * Instantiate a root component.
@@ -49943,7 +50258,7 @@ function cacheMatchingLocalNames(tNode, localRefs, exportsMap) {
         for (let i = 0; i < localRefs.length; i += 2) {
             const index = exportsMap[localRefs[i + 1]];
             if (index == null)
-                throw new RuntimeError("301" /* EXPORT_NOT_FOUND */, `Export of name '${localRefs[i + 1]}' not found!`);
+                throw new RuntimeError(-301 /* EXPORT_NOT_FOUND */, `Export of name '${localRefs[i + 1]}' not found!`);
             localNames.push(localRefs[i], index);
         }
     }
@@ -50869,7 +51184,10 @@ class R3Injector {
     }
     assertNotDestroyed() {
         if (this._destroyed) {
-            throw new Error('Injector has already been destroyed.');
+            const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                'Injector has already been destroyed.' :
+                '';
+            throw new RuntimeError(205 /* INJECTOR_ALREADY_DESTROYED */, errorMessage);
         }
     }
     /**
@@ -51033,21 +51351,28 @@ function injectableDefOrInjectorDefFactory(token) {
     // InjectionTokens should have an injectable def (ɵprov) and thus should be handled above.
     // If it's missing that, it's an error.
     if (token instanceof InjectionToken) {
-        throw new Error(`Token ${stringify(token)} is missing a ɵprov definition.`);
+        const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+            `Token ${stringify(token)} is missing a ɵprov definition.` :
+            '';
+        throw new RuntimeError(204 /* INVALID_INJECTION_TOKEN */, errorMessage);
     }
     // Undecorated types can sometimes be created if they have no constructor arguments.
     if (token instanceof Function) {
         return getUndecoratedInjectableFactory(token);
     }
     // There was no way to resolve a factory for this token.
-    throw new Error('unreachable');
+    const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ? 'unreachable' : '';
+    throw new RuntimeError(204 /* INVALID_INJECTION_TOKEN */, errorMessage);
 }
 function getUndecoratedInjectableFactory(token) {
     // If the token has parameters then it has dependencies that we cannot resolve implicitly.
     const paramLength = token.length;
     if (paramLength > 0) {
         const args = newArray(paramLength, '?');
-        throw new Error(`Can't resolve all parameters for ${stringify(token)}: (${args.join(', ')}).`);
+        const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+            `Can't resolve all parameters for ${stringify(token)}: (${args.join(', ')}).` :
+            '';
+        throw new RuntimeError(204 /* INVALID_INJECTION_TOKEN */, errorMessage);
     }
     // The constructor function appears to have no parameters.
     // This might be because it inherits from a super-class. In which case, use an injectable
@@ -51906,7 +52231,10 @@ function ɵɵInheritDefinitionFeature(definition) {
         }
         else {
             if (superType.ɵcmp) {
-                throw new Error('Directives cannot inherit Components');
+                const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                    'Directives cannot inherit Components' :
+                    '';
+                throw new RuntimeError(903 /* INVALID_INHERITANCE */, errorMessage);
             }
             // Don't use getComponentDef/getDirectiveDef. This logic relies on inheritance.
             superDef = superType.ɵdir;
@@ -54168,7 +54496,7 @@ function logUnknownElementError(tView, element, tNode, hasDirectives) {
                 message +=
                     `2. To allow any element add 'NO_ERRORS_SCHEMA' to the '@NgModule.schemas' of this component.`;
             }
-            console.error(formatRuntimeError("304" /* UNKNOWN_ELEMENT */, message));
+            console.error(formatRuntimeError(304 /* UNKNOWN_ELEMENT */, message));
         }
     }
 }
@@ -58687,7 +59015,9 @@ function applyMutableOpCodes(tView, mutableOpCodes, lView, anchorRNode) {
                     setElementAttribute(renderer, getNativeByIndex(elementNodeIndex, lView), null, null, attrName, attrValue, null);
                     break;
                 default:
-                    throw new Error(`Unable to determine the type of mutate operation for "${opCode}"`);
+                    if (ngDevMode) {
+                        throw new RuntimeError(700 /* INVALID_I18N_STRUCTURE */, `Unable to determine the type of mutate operation for "${opCode}"`);
+                    }
             }
         }
         else {
@@ -59313,7 +59643,7 @@ function i18nStartFirstCreatePass(tView, parentTNodeIndex, lView, index, message
     };
 }
 /**
- * Allocate space in i18n Range add create OpCode instruction to crete a text or comment node.
+ * Allocate space in i18n Range add create OpCode instruction to create a text or comment node.
  *
  * @param tView Current `TView` needed to allocate space in i18n range.
  * @param rootTNode Root `TNode` of the i18n block. This node determines if the new TNode will be
@@ -60614,7 +60944,7 @@ class Version {
 /**
  * @publicApi
  */
-const VERSION = new Version('13.1.1');
+const VERSION = new Version('13.1.3');
 
 /**
  * @license
@@ -60950,7 +61280,8 @@ class ViewRef$1 {
     }
     attachToViewContainerRef() {
         if (this._appRef) {
-            throw new Error('This view is already attached directly to the ApplicationRef!');
+            const errorMessage = ngDevMode ? 'This view is already attached directly to the ApplicationRef!' : '';
+            throw new RuntimeError(902 /* VIEW_ALREADY_ATTACHED */, errorMessage);
         }
         this._attachedToViewContainer = true;
     }
@@ -60960,7 +61291,8 @@ class ViewRef$1 {
     }
     attachToAppRef(appRef) {
         if (this._attachedToViewContainer) {
-            throw new Error('This view is already attached to a ViewContainer!');
+            const errorMessage = ngDevMode ? 'This view is already attached to a ViewContainer!' : '';
+            throw new RuntimeError(902 /* VIEW_ALREADY_ATTACHED */, errorMessage);
         }
         this._appRef = appRef;
     }
@@ -61352,7 +61684,7 @@ class NgModuleRef extends NgModuleRef$1 {
             }
         ], stringify(ngModuleType));
         // We need to resolve the injector types separately from the injector creation, because
-        // the module might be trying to use this ref in its contructor for DI which will cause a
+        // the module might be trying to use this ref in its constructor for DI which will cause a
         // circular error that will eventually error out, because the injector isn't created yet.
         this._r3Injector._resolveInjectorDefTypes();
         this.instance = this.get(ngModuleType);
@@ -61831,7 +62163,7 @@ function getPipeDef(name, registry) {
         const declarationLView = lView[DECLARATION_COMPONENT_VIEW];
         const context = declarationLView[CONTEXT];
         const component = context ? ` in the '${context.constructor.name}' component` : '';
-        throw new RuntimeError("302" /* PIPE_NOT_FOUND */, `The pipe '${name}' could not be found${component}!`);
+        throw new RuntimeError(-302 /* PIPE_NOT_FOUND */, `The pipe '${name}' could not be found${component}!`);
     }
 }
 /**
@@ -64080,7 +64412,7 @@ const HostBinding = makePropDecorator('HostBinding', (hostPropertyName) => ({ ho
  *   @HostListener('click', ['$event.target'])
  *   onClick(btn) {
  *     console.log('button', btn, 'number of clicks:', this.numberOfClicks++);
- *  }
+ *   }
  * }
  *
  * @Component({
@@ -65424,7 +65756,7 @@ function createPlatform(injector) {
         const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
             'There can be only one platform. Destroy the previous one to create a new one.' :
             '';
-        throw new RuntimeError("400" /* MULTIPLE_PLATFORMS */, errorMessage);
+        throw new RuntimeError(400 /* MULTIPLE_PLATFORMS */, errorMessage);
     }
     publishDefaultGlobalUtils();
     _platform = injector.get(PlatformRef);
@@ -65473,11 +65805,11 @@ function assertPlatform(requiredToken) {
     const platform = getPlatform();
     if (!platform) {
         const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ? 'No platform exists!' : '';
-        throw new RuntimeError("401" /* PLATFORM_NOT_FOUND */, errorMessage);
+        throw new RuntimeError(401 /* PLATFORM_NOT_FOUND */, errorMessage);
     }
     if ((typeof ngDevMode === 'undefined' || ngDevMode) &&
         !platform.injector.get(requiredToken, null)) {
-        throw new RuntimeError("400" /* MULTIPLE_PLATFORMS */, 'A platform with a different configuration has been created. Please destroy it first.');
+        throw new RuntimeError(400 /* MULTIPLE_PLATFORMS */, 'A platform with a different configuration has been created. Please destroy it first.');
     }
     return platform;
 }
@@ -65564,7 +65896,7 @@ class PlatformRef {
                 const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
                     'No ErrorHandler. Is platform module (BrowserModule) included?' :
                     '';
-                throw new RuntimeError("402" /* ERROR_HANDLER_NOT_FOUND */, errorMessage);
+                throw new RuntimeError(402 /* ERROR_HANDLER_NOT_FOUND */, errorMessage);
             }
             ngZone.runOutsideAngular(() => {
                 const subscription = ngZone.onError.subscribe({
@@ -65625,7 +65957,7 @@ class PlatformRef {
                     `but it does not declare "@NgModule.bootstrap" components nor a "ngDoBootstrap" method. ` +
                     `Please define one of these.` :
                 '';
-            throw new RuntimeError("403" /* BOOTSTRAP_COMPONENTS_NOT_FOUND */, errorMessage);
+            throw new RuntimeError(403 /* BOOTSTRAP_COMPONENTS_NOT_FOUND */, errorMessage);
         }
         this._modules.push(moduleRef);
     }
@@ -65651,7 +65983,7 @@ class PlatformRef {
             const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
                 'The platform has already been destroyed!' :
                 '';
-            throw new RuntimeError("404" /* ALREADY_DESTROYED_PLATFORM */, errorMessage);
+            throw new RuntimeError(404 /* ALREADY_DESTROYED_PLATFORM */, errorMessage);
         }
         this._modules.slice().forEach(module => module.destroy());
         this._destroyListeners.forEach(listener => listener());
@@ -65917,7 +66249,7 @@ class ApplicationRef {
                 'Cannot bootstrap as there are still asynchronous initializers running. ' +
                     'Bootstrap components in the `ngDoBootstrap` method of the root module.' :
                 '';
-            throw new RuntimeError("405" /* ASYNC_INITIALIZERS_STILL_RUNNING */, errorMessage);
+            throw new RuntimeError(405 /* ASYNC_INITIALIZERS_STILL_RUNNING */, errorMessage);
         }
         let componentFactory;
         if (componentOrFactory instanceof ComponentFactory$1) {
@@ -65967,7 +66299,7 @@ class ApplicationRef {
             const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
                 'ApplicationRef.tick is called recursively' :
                 '';
-            throw new RuntimeError("101" /* RECURSIVE_APPLICATION_REF_TICK */, errorMessage);
+            throw new RuntimeError(101 /* RECURSIVE_APPLICATION_REF_TICK */, errorMessage);
         }
         try {
             this._runningTick = true;
@@ -66958,7 +67290,10 @@ class DefaultIterableDiffer {
         if (collection == null)
             collection = [];
         if (!isListLikeIterable(collection)) {
-            throw new Error(`Error trying to diff '${stringify(collection)}'. Only arrays and iterables are allowed`);
+            const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                `Error trying to diff '${stringify(collection)}'. Only arrays and iterables are allowed` :
+                '';
+            throw new RuntimeError(900 /* INVALID_DIFFER_INPUT */, errorMessage);
         }
         if (this.check(collection)) {
             return this;
@@ -67559,7 +67894,10 @@ class DefaultKeyValueDiffer {
             map = new Map();
         }
         else if (!(map instanceof Map || isJsObject(map))) {
-            throw new Error(`Error trying to diff '${stringify(map)}'. Only maps and objects are allowed`);
+            const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                `Error trying to diff '${stringify(map)}'. Only maps and objects are allowed` :
+                '';
+            throw new RuntimeError(900 /* INVALID_DIFFER_INPUT */, errorMessage);
         }
         return this.check(map) ? this : null;
     }
@@ -67806,7 +68144,10 @@ class IterableDiffers {
             return factory;
         }
         else {
-            throw new Error(`Cannot find a differ supporting object '${iterable}' of type '${getTypeNameForDebugging(iterable)}'`);
+            const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+                `Cannot find a differ supporting object '${iterable}' of type '${getTypeNameForDebugging(iterable)}'` :
+                '';
+            throw new RuntimeError(901 /* NO_SUPPORTING_DIFFER_FACTORY */, errorMessage);
         }
     }
 }
@@ -67880,7 +68221,10 @@ class KeyValueDiffers {
         if (factory) {
             return factory;
         }
-        throw new Error(`Cannot find a differ supporting object '${kv}'`);
+        const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+            `Cannot find a differ supporting object '${kv}'` :
+            '';
+        throw new RuntimeError(901 /* NO_SUPPORTING_DIFFER_FACTORY */, errorMessage);
     }
 }
 /** @nocollapse */
@@ -68313,7 +68657,8 @@ function buildLayoutCSS(value) {
   * Use default fallback of 'row'
   */
 function validateValue(value) {
-    value = value ? value.toLowerCase() : '';
+    var _a;
+    value = (_a = value === null || value === void 0 ? void 0 : value.toLowerCase()) !== null && _a !== void 0 ? _a : '';
     let [direction, wrap, inline] = value.split(' ');
     // First value must be the `flex-direction`
     if (!LAYOUT_VALUES.find(x => x === direction)) {
@@ -68368,10 +68713,10 @@ function validateWrapValue(value) {
  */
 function buildCSS(direction, wrap = null, inline = false) {
     return {
-        'display': inline ? 'inline-flex' : 'flex',
+        display: inline ? 'inline-flex' : 'flex',
         'box-sizing': 'border-box',
         'flex-direction': direction,
-        'flex-wrap': !!wrap ? wrap : null
+        'flex-wrap': wrap || null,
     };
 }
 
@@ -68460,7 +68805,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "validateBasis": () => (/* binding */ validateBasis),
 /* harmony export */   "ɵMatchMedia": () => (/* binding */ MatchMedia),
 /* harmony export */   "ɵMockMatchMedia": () => (/* binding */ MockMatchMedia),
-/* harmony export */   "ɵMockMatchMediaProvider": () => (/* binding */ MockMatchMediaProvider)
+/* harmony export */   "ɵMockMatchMediaProvider": () => (/* binding */ MockMatchMediaProvider),
+/* harmony export */   "ɵmultiply": () => (/* binding */ multiply)
 /* harmony export */ });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/common */ 6362);
@@ -68470,15 +68816,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! rxjs */ 228);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! rxjs */ 9672);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! rxjs */ 745);
-/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! rxjs */ 3280);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! rxjs */ 3280);
 /* harmony import */ var _angular_flex_layout_private_utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/flex-layout/_private-utils */ 7413);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 116);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! rxjs/operators */ 9337);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! rxjs/operators */ 635);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! rxjs/operators */ 1989);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! rxjs/operators */ 2673);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! rxjs/operators */ 8951);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! rxjs/operators */ 9295);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! rxjs/operators */ 8192);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! rxjs/operators */ 8951);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! rxjs/operators */ 9295);
 
 
 
@@ -68698,7 +69045,13 @@ const DEFAULT_CONFIG = {
   useColumnBasisZero: true,
   printWithBreakpoints: [],
   mediaTriggerAutoRestore: true,
-  ssrObserveBreakpoints: []
+  ssrObserveBreakpoints: [],
+  // This is disabled by default because otherwise the multiplier would
+  // run for all users, regardless of whether they're using this feature.
+  // Instead, we disable it by default, which requires this ugly cast.
+  multiplier: undefined,
+  defaultUnit: 'px',
+  detectLayoutDisplay: false
 };
 const LAYOUT_CONFIG = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('Flex Layout token, config options for the library', {
   providedIn: 'root',
@@ -68854,7 +69207,9 @@ class StyleUtils {
 
 
   lookupAttributeValue(element, attribute) {
-    return element.getAttribute(attribute) || '';
+    var _a;
+
+    return (_a = element.getAttribute(attribute)) !== null && _a !== void 0 ? _a : '';
   }
   /**
    * Find the DOM element's inline style value (if any)
@@ -68862,7 +69217,7 @@ class StyleUtils {
 
 
   lookupInlineStyle(element, styleName) {
-    return (0,_angular_common__WEBPACK_IMPORTED_MODULE_0__.isPlatformBrowser)(this._platformId) ? element.style.getPropertyValue(styleName) : this._getServerStyle(element, styleName);
+    return (0,_angular_common__WEBPACK_IMPORTED_MODULE_0__.isPlatformBrowser)(this._platformId) ? element.style.getPropertyValue(styleName) : getServerStyle(element, styleName);
   }
   /**
    * Determine the inline or inherited CSS style
@@ -68910,68 +69265,12 @@ class StyleUtils {
         value = value ? value + '' : '';
 
         if ((0,_angular_common__WEBPACK_IMPORTED_MODULE_0__.isPlatformBrowser)(this._platformId) || !this._serverModuleLoaded) {
-          (0,_angular_common__WEBPACK_IMPORTED_MODULE_0__.isPlatformBrowser)(this._platformId) ? element.style.setProperty(key, value) : this._setServerStyle(element, key, value);
+          (0,_angular_common__WEBPACK_IMPORTED_MODULE_0__.isPlatformBrowser)(this._platformId) ? element.style.setProperty(key, value) : setServerStyle(element, key, value);
         } else {
           this._serverStylesheet.addStyleToElement(element, key, value);
         }
       }
     });
-  }
-
-  _setServerStyle(element, styleName, styleValue) {
-    styleName = styleName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-
-    const styleMap = this._readStyleAttribute(element);
-
-    styleMap[styleName] = styleValue || '';
-
-    this._writeStyleAttribute(element, styleMap);
-  }
-
-  _getServerStyle(element, styleName) {
-    const styleMap = this._readStyleAttribute(element);
-
-    return styleMap[styleName] || '';
-  }
-
-  _readStyleAttribute(element) {
-    const styleMap = {};
-    const styleAttribute = element.getAttribute('style');
-
-    if (styleAttribute) {
-      const styleList = styleAttribute.split(/;+/g);
-
-      for (let i = 0; i < styleList.length; i++) {
-        const style = styleList[i].trim();
-
-        if (style.length > 0) {
-          const colonIndex = style.indexOf(':');
-
-          if (colonIndex === -1) {
-            throw new Error(`Invalid CSS style: ${style}`);
-          }
-
-          const name = style.substr(0, colonIndex).trim();
-          styleMap[name] = style.substr(colonIndex + 1).trim();
-        }
-      }
-    }
-
-    return styleMap;
-  }
-
-  _writeStyleAttribute(element, styleMap) {
-    let styleAttrValue = '';
-
-    for (const key in styleMap) {
-      const newValue = styleMap[key];
-
-      if (newValue) {
-        styleAttrValue += key + ':' + styleMap[key] + ';';
-      }
-    }
-
-    element.setAttribute('style', styleAttrValue);
   }
 
 }
@@ -69016,6 +69315,60 @@ StyleUtils.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["�
     }];
   }, null);
 })();
+
+function getServerStyle(element, styleName) {
+  var _a;
+
+  const styleMap = readStyleAttribute(element);
+  return (_a = styleMap[styleName]) !== null && _a !== void 0 ? _a : '';
+}
+
+function setServerStyle(element, styleName, styleValue) {
+  styleName = styleName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+  const styleMap = readStyleAttribute(element);
+  styleMap[styleName] = styleValue !== null && styleValue !== void 0 ? styleValue : '';
+  writeStyleAttribute(element, styleMap);
+}
+
+function writeStyleAttribute(element, styleMap) {
+  let styleAttrValue = '';
+
+  for (const key in styleMap) {
+    const newValue = styleMap[key];
+
+    if (newValue) {
+      styleAttrValue += `${key}:${styleMap[key]};`;
+    }
+  }
+
+  element.setAttribute('style', styleAttrValue);
+}
+
+function readStyleAttribute(element) {
+  const styleMap = {};
+  const styleAttribute = element.getAttribute('style');
+
+  if (styleAttribute) {
+    const styleList = styleAttribute.split(/;+/g);
+
+    for (let i = 0; i < styleList.length; i++) {
+      const style = styleList[i].trim();
+
+      if (style.length > 0) {
+        const colonIndex = style.indexOf(':');
+
+        if (colonIndex === -1) {
+          throw new Error(`Invalid CSS style: ${style}`);
+        }
+
+        const name = style.substr(0, colonIndex).trim();
+        styleMap[name] = style.substr(colonIndex + 1).trim();
+      }
+    }
+  }
+
+  return styleMap;
+}
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -69089,8 +69442,10 @@ class MatchMedia {
 
 
   isActive(mediaQuery) {
+    var _a;
+
     const mql = this.registry.get(mediaQuery);
-    return !!mql ? mql.matches : this.registerQuery(mediaQuery).some(m => m.matches);
+    return (_a = mql === null || mql === void 0 ? void 0 : mql.matches) !== null && _a !== void 0 ? _a : this.registerQuery(mediaQuery).some(m => m.matches);
   }
   /**
    * External observers can watch for all (or a specific) mql changes.
@@ -69518,11 +69873,11 @@ class BreakPointRegistry {
 
 
   findByAlias(alias) {
-    return !alias ? null : this.findWithPredicate(alias, bp => bp.alias == alias);
+    return !alias ? null : this.findWithPredicate(alias, bp => bp.alias === alias);
   }
 
   findByQuery(query) {
-    return this.findWithPredicate(query, bp => bp.mediaQuery == query);
+    return this.findWithPredicate(query, bp => bp.mediaQuery === query);
   }
   /**
    * Get all the breakpoints whose ranges could overlapping `normal` ranges;
@@ -69531,7 +69886,7 @@ class BreakPointRegistry {
 
 
   get overlappings() {
-    return this.items.filter(it => it.overlapping == true);
+    return this.items.filter(it => it.overlapping);
   }
   /**
    * Get list of all registered (non-empty) breakpoint aliases
@@ -69549,7 +69904,11 @@ class BreakPointRegistry {
 
 
   get suffixes() {
-    return this.items.map(it => !!it.suffix ? it.suffix : '');
+    return this.items.map(it => {
+      var _a;
+
+      return (_a = it === null || it === void 0 ? void 0 : it.suffix) !== null && _a !== void 0 ? _a : '';
+    });
   }
   /**
    * Memoized lookup using custom predicate function
@@ -69557,14 +69916,16 @@ class BreakPointRegistry {
 
 
   findWithPredicate(key, searchFn) {
+    var _a;
+
     let response = this.findByMap.get(key);
 
     if (!response) {
-      response = this.items.find(searchFn) || null;
+      response = (_a = this.items.find(searchFn)) !== null && _a !== void 0 ? _a : null;
       this.findByMap.set(key, response);
     }
 
-    return response || null;
+    return response !== null && response !== void 0 ? response : null;
   }
 
 }
@@ -69625,7 +69986,7 @@ class PrintHook {
     //  and `afterprint` event listeners.
 
     this.registeredBeforeAfterPrintHooks = false; // isPrintingBeforeAfterEvent is used to track if we are printing from within
-    // a `beforeprint` event handler. This prevents the typicall `stopPrinting`
+    // a `beforeprint` event handler. This prevents the typical `stopPrinting`
     // form `interceptEvents` so that printing is not stopped while the dialog
     // is still open. This is an extension of the `isPrinting` property on
     // browsers which support `beforeprint` and `afterprint` events.
@@ -69633,7 +69994,7 @@ class PrintHook {
     this.isPrintingBeforeAfterEvent = false;
     this.beforePrintEventListeners = [];
     this.afterPrintEventListeners = [];
-    /** Is this service currently in Print-mode ? */
+    this.formerActivations = null; // Is this service currently in print mode
 
     this.isPrinting = false;
     this.queue = new PrintQueue();
@@ -69655,7 +70016,9 @@ class PrintHook {
 
 
   get printAlias() {
-    return this.layoutConfig.printWithBreakpoints || [];
+    var _a;
+
+    return [...((_a = this.layoutConfig.printWithBreakpoints) !== null && _a !== void 0 ? _a : [])];
   }
   /** Lookup breakpoints associated with print aliases. */
 
@@ -69677,12 +70040,14 @@ class PrintHook {
 
 
   updateEvent(event) {
+    var _a;
+
     let bp = this.breakpoints.findByQuery(event.mediaQuery);
 
     if (this.isPrintEvent(event)) {
       // Reset from 'print' to first (highest priority) print breakpoint
       bp = this.getEventBreakpoints(event)[0];
-      event.mediaQuery = bp ? bp.mediaQuery : '';
+      event.mediaQuery = (_a = bp === null || bp === void 0 ? void 0 : bp.mediaQuery) !== null && _a !== void 0 ? _a : '';
     }
 
     return mergeAlias(event, bp);
@@ -69730,13 +70095,12 @@ class PrintHook {
     this.afterPrintEventListeners.push(afterPrintListener);
   }
   /**
-   * Prepare RxJS filter operator with partial application
-   * @return pipeable filter predicate
+   * Prepare RxJS tap operator with partial application
+   * @return pipeable tap predicate
    */
 
 
   interceptEvents(target) {
-    this.registerBeforeAfterPrintHooks(target);
     return event => {
       if (this.isPrintEvent(event)) {
         if (event.matches && !this.isPrinting) {
@@ -69746,9 +70110,11 @@ class PrintHook {
           this.stopPrinting(target);
           target.updateStyles();
         }
-      } else {
-        this.collectActivations(event);
+
+        return;
       }
+
+      this.collectActivations(target, event);
     };
   }
   /** Stop mediaChange event propagation in event streams */
@@ -69767,6 +70133,7 @@ class PrintHook {
 
   startPrinting(target, bpList) {
     this.isPrinting = true;
+    this.formerActivations = target.activatedBreakpoints;
     target.activatedBreakpoints = this.queue.addPrintBreakpoints(bpList);
   }
   /** For any print de-activations, reset the entire print queue */
@@ -69775,6 +70142,7 @@ class PrintHook {
   stopPrinting(target) {
     target.activatedBreakpoints = this.deactivations;
     this.deactivations = [];
+    this.formerActivations = null;
     this.queue.clear();
     this.isPrinting = false;
   }
@@ -69798,21 +70166,29 @@ class PrintHook {
    */
 
 
-  collectActivations(event) {
+  collectActivations(target, event) {
     if (!this.isPrinting || this.isPrintingBeforeAfterEvent) {
-      if (!event.matches) {
-        const bp = this.breakpoints.findByQuery(event.mediaQuery);
-
-        if (bp) {
-          // Deactivating a breakpoint
-          this.deactivations.push(bp);
-          this.deactivations.sort(sortDescendingPriority);
-        }
-      } else if (!this.isPrintingBeforeAfterEvent) {
+      if (!this.isPrintingBeforeAfterEvent) {
         // Only clear deactivations if we aren't printing from a `beforeprint` event.
-        // Otherwise this will clear before `stopPrinting()` is called to restore
+        // Otherwise, this will clear before `stopPrinting()` is called to restore
         // the pre-Print Activations.
         this.deactivations = [];
+        return;
+      }
+
+      if (!event.matches) {
+        const bp = this.breakpoints.findByQuery(event.mediaQuery); // Deactivating a breakpoint
+
+        if (bp) {
+          const hasFormerBp = this.formerActivations && this.formerActivations.includes(bp);
+          const wasActivated = !this.formerActivations && target.activatedBreakpoints.includes(bp);
+          const shouldDeactivate = hasFormerBp || wasActivated;
+
+          if (shouldDeactivate) {
+            this.deactivations.push(bp);
+            this.deactivations.sort(sortDescendingPriority);
+          }
+        }
       }
     }
   }
@@ -69912,7 +70288,9 @@ class PrintQueue {
 
 
 function isPrintBreakPoint(bp) {
-  return bp ? bp.mediaQuery.startsWith(PRINT) : false;
+  var _a;
+
+  return (_a = bp === null || bp === void 0 ? void 0 : bp.mediaQuery.startsWith(PRINT)) !== null && _a !== void 0 ? _a : false;
 }
 /**
  * @license
@@ -69933,7 +70311,8 @@ class MediaMarshaller {
     this.matchMedia = matchMedia;
     this.breakpoints = breakpoints;
     this.hook = hook;
-    this.activatedBreakpoints = [];
+    this._useFallbacks = true;
+    this._activatedBreakpoints = [];
     this.elementMap = new Map();
     this.elementKeyMap = new WeakMap();
     this.watcherMap = new WeakMap(); // special triggers to update elements
@@ -69947,7 +70326,21 @@ class MediaMarshaller {
   }
 
   get activatedAlias() {
-    return this.activatedBreakpoints[0] ? this.activatedBreakpoints[0].alias : '';
+    var _a, _b;
+
+    return (_b = (_a = this.activatedBreakpoints[0]) === null || _a === void 0 ? void 0 : _a.alias) !== null && _b !== void 0 ? _b : '';
+  }
+
+  set activatedBreakpoints(bps) {
+    this._activatedBreakpoints = [...bps];
+  }
+
+  get activatedBreakpoints() {
+    return [...this._activatedBreakpoints];
+  }
+
+  set useFallbacks(value) {
+    this._useFallbacks = value;
   }
   /**
    * Update styles on breakpoint activates or deactivates
@@ -69960,15 +70353,20 @@ class MediaMarshaller {
 
     if (bp) {
       mc = mergeAlias(mc, bp);
+      const bpIndex = this.activatedBreakpoints.indexOf(bp);
 
-      if (mc.matches && this.activatedBreakpoints.indexOf(bp) === -1) {
-        this.activatedBreakpoints.push(bp);
-        this.activatedBreakpoints.sort(sortDescendingPriority);
+      if (mc.matches && bpIndex === -1) {
+        this._activatedBreakpoints.push(bp);
+
+        this._activatedBreakpoints.sort(sortDescendingPriority);
+
         this.updateStyles();
-      } else if (!mc.matches && this.activatedBreakpoints.indexOf(bp) !== -1) {
+      } else if (!mc.matches && bpIndex !== -1) {
         // Remove the breakpoint when it's deactivated
-        this.activatedBreakpoints.splice(this.activatedBreakpoints.indexOf(bp), 1);
-        this.activatedBreakpoints.sort(sortDescendingPriority);
+        this._activatedBreakpoints.splice(bpIndex, 1);
+
+        this._activatedBreakpoints.sort(sortDescendingPriority);
+
         this.updateStyles();
       }
     }
@@ -70040,13 +70438,15 @@ class MediaMarshaller {
 
 
   setValue(element, key, val, bp) {
+    var _a;
+
     let bpMap = this.elementMap.get(element);
 
     if (!bpMap) {
       bpMap = new Map().set(bp, new Map().set(key, val));
       this.elementMap.set(element, bpMap);
     } else {
-      const values = (bpMap.get(bp) || new Map()).set(key, val);
+      const values = ((_a = bpMap.get(bp)) !== null && _a !== void 0 ? _a : new Map()).set(key, val);
       bpMap.set(bp, values);
       this.elementMap.set(element, bpMap);
     }
@@ -70244,6 +70644,12 @@ class MediaMarshaller {
           return valueMap;
         }
       }
+    } // On the server, we explicitly have an "all" section filled in to begin with.
+    // So we don't need to aggressively find a fallback if no explicit value exists.
+
+
+    if (!this._useFallbacks) {
+      return undefined;
     }
 
     const lastHope = bpMap.get('');
@@ -70255,9 +70661,9 @@ class MediaMarshaller {
 
 
   observeActivations() {
-    const target = this;
     const queries = this.breakpoints.items.map(bp => bp.mediaQuery);
-    this.matchMedia.observe(this.hook.withPrintQuery(queries)).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.tap)(this.hook.interceptEvents(target)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(this.hook.blockPropagation())).subscribe(this.onMediaChange.bind(this));
+    this.hook.registerBeforeAfterPrintHooks(this);
+    this.matchMedia.observe(this.hook.withPrintQuery(queries)).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.tap)(this.hook.interceptEvents(this)), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(this.hook.blockPropagation())).subscribe(this.onMediaChange.bind(this));
   }
 
 }
@@ -70290,15 +70696,12 @@ MediaMarshaller.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1
 })();
 
 function initBuilderMap(map, element, key, input) {
+  var _a;
+
   if (input !== undefined) {
-    let oldMap = map.get(element);
-
-    if (!oldMap) {
-      oldMap = new Map();
-      map.set(element, oldMap);
-    }
-
+    const oldMap = (_a = map.get(element)) !== null && _a !== void 0 ? _a : new Map();
     oldMap.set(key, input);
+    map.set(element, oldMap);
   }
 }
 /**
@@ -70401,6 +70804,7 @@ class BaseDirective2 {
     });
     this.applyStyleToElement(this.mru);
     this.mru = {};
+    this.currentValue = undefined;
   }
   /** Force trigger style updates on DOM element */
 
@@ -70531,8 +70935,7 @@ class MockMatchMedia extends MatchMedia {
   /** Feature to support manual, simulated activation of a mediaQuery. */
 
 
-  activate(mediaQuery, useOverlaps = false) {
-    useOverlaps = useOverlaps || this.useOverlaps;
+  activate(mediaQuery, useOverlaps = this.useOverlaps) {
     mediaQuery = this._validateQuery(mediaQuery);
 
     if (useOverlaps || !this.isActive(mediaQuery)) {
@@ -70549,9 +70952,11 @@ class MockMatchMedia extends MatchMedia {
 
 
   _validateQuery(queryOrAlias) {
+    var _a;
+
     const bp = this._breakpoints.findByAlias(queryOrAlias);
 
-    return bp && bp.mediaQuery || queryOrAlias;
+    return (_a = bp === null || bp === void 0 ? void 0 : bp.mediaQuery) !== null && _a !== void 0 ? _a : queryOrAlias;
   }
   /**
    * Manually onMediaChange any overlapping mediaQueries to simulate
@@ -70560,10 +70965,12 @@ class MockMatchMedia extends MatchMedia {
 
 
   _activateWithOverlaps(mediaQuery, useOverlaps) {
+    var _a;
+
     if (useOverlaps) {
       const bp = this._breakpoints.findByQuery(mediaQuery);
 
-      const alias = bp ? bp.alias : 'unknown'; // Simulate activation of overlapping lt-<XXX> ranges
+      const alias = (_a = bp === null || bp === void 0 ? void 0 : bp.alias) !== null && _a !== void 0 ? _a : 'unknown'; // Simulate activation of overlapping lt-<XXX> ranges
 
       switch (alias) {
         case 'lg':
@@ -70621,9 +71028,11 @@ class MockMatchMedia extends MatchMedia {
 
   _activateByAlias(aliases) {
     const activate = alias => {
+      var _a;
+
       const bp = this._breakpoints.findByAlias(alias);
 
-      this._activateByQuery(bp ? bp.mediaQuery : alias);
+      this._activateByQuery((_a = bp === null || bp === void 0 ? void 0 : bp.mediaQuery) !== null && _a !== void 0 ? _a : alias);
     };
 
     aliases.forEach(activate);
@@ -70977,15 +71386,28 @@ class MediaObserver {
 
     const excludeOverlaps = changes => {
       return !this.filterOverlaps ? changes : changes.filter(change => {
+        var _a;
+
         const bp = this.breakpoints.findByQuery(change.mediaQuery);
-        return !bp ? true : !bp.overlapping;
+        return (_a = bp === null || bp === void 0 ? void 0 : bp.overlapping) !== null && _a !== void 0 ? _a : true;
       });
+    };
+
+    const ignoreDuplicates = (previous, current) => {
+      if (previous.length !== current.length) {
+        return false;
+      }
+
+      const previousMqs = previous.map(mc => mc.mediaQuery);
+      const currentMqs = new Set(current.map(mc => mc.mediaQuery));
+      const difference = new Set(previousMqs.filter(mq => !currentMqs.has(mq)));
+      return difference.size === 0;
     };
     /**
      */
 
 
-    return this.matchMedia.observe(this.hook.withPrintQuery(mqList)).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(change => change.matches), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_10__.debounceTime)(0, rxjs__WEBPACK_IMPORTED_MODULE_11__.asapScheduler), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_12__.switchMap)(_ => (0,rxjs__WEBPACK_IMPORTED_MODULE_13__.of)(this.findAllActivations())), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_9__.map)(excludeOverlaps), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(hasChanges), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_14__.takeUntil)(this.destroyed$));
+    return this.matchMedia.observe(this.hook.withPrintQuery(mqList)).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(change => change.matches), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_10__.debounceTime)(0, rxjs__WEBPACK_IMPORTED_MODULE_11__.asapScheduler), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_12__.switchMap)(_ => (0,rxjs__WEBPACK_IMPORTED_MODULE_13__.of)(this.findAllActivations())), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_9__.map)(excludeOverlaps), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.filter)(hasChanges), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_14__.distinctUntilChanged)(ignoreDuplicates), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_15__.takeUntil)(this.destroyed$));
   }
   /**
    * Find all current activations and prepare single list of activations
@@ -70995,7 +71417,7 @@ class MediaObserver {
 
   findAllActivations() {
     const mergeMQAlias = change => {
-      let bp = this.breakpoints.findByQuery(change.mediaQuery);
+      const bp = this.breakpoints.findByQuery(change.mediaQuery);
       return mergeAlias(change, bp);
     };
 
@@ -71040,8 +71462,10 @@ MediaObserver.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__
 
 
 function toMediaQuery(query, locator) {
-  const bp = locator.findByAlias(query) || locator.findByQuery(query);
-  return bp ? bp.mediaQuery : null;
+  var _a, _b;
+
+  const bp = (_a = locator.findByAlias(query)) !== null && _a !== void 0 ? _a : locator.findByQuery(query);
+  return (_b = bp === null || bp === void 0 ? void 0 : bp.mediaQuery) !== null && _b !== void 0 ? _b : null;
 }
 /**
  * Split each query string into separate query strings if two queries are provided as comma
@@ -71138,7 +71562,7 @@ class MediaTrigger {
     const enableAutoRestore = isBrowser && this.layoutConfig.mediaTriggerAutoRestore;
 
     if (enableAutoRestore) {
-      const resize$ = (0,rxjs__WEBPACK_IMPORTED_MODULE_15__.fromEvent)(window, 'resize').pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_16__.take)(1));
+      const resize$ = (0,rxjs__WEBPACK_IMPORTED_MODULE_16__.fromEvent)(window, 'resize').pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_17__.take)(1));
       this.resizeSubscription = resize$.subscribe(this.restore.bind(this));
     }
   }
@@ -71366,6 +71790,26 @@ function validateBasis(basis, grow = '1', shrink = '1') {
 
 function _validateCalcValue(calc) {
   return calc.replace(/[\s]/g, '').replace(/[\/\*\+\-]/g, ' $& ');
+}
+
+const MULTIPLIER_SUFFIX = 'x';
+
+function multiply(value, multiplier) {
+  if (multiplier === undefined) {
+    return value;
+  }
+
+  const transformValue = possibleValue => {
+    const numberValue = +possibleValue.slice(0, -MULTIPLIER_SUFFIX.length);
+
+    if (value.endsWith(MULTIPLIER_SUFFIX) && !isNaN(numberValue)) {
+      return `${numberValue * multiplier.value}${multiplier.unit}`;
+    }
+
+    return value;
+  };
+
+  return value.includes(' ') ? value.split(' ').map(transformValue).join(' ') : transformValue(value);
 }
 /**
  * @license
@@ -72137,6 +72581,8 @@ function keyValuesToMap(map, entry) {
 
 class StyleDirective extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.BaseDirective2 {
   constructor(elementRef, styler, marshal, sanitizer, differs, renderer2, ngStyleInstance, serverLoaded, platformId) {
+    var _a;
+
     super(elementRef, null, styler, marshal);
     this.sanitizer = sanitizer;
     this.ngStyleInstance = ngStyleInstance;
@@ -72149,7 +72595,7 @@ class StyleDirective extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_
     }
 
     this.init();
-    const styles = this.nativeElement.getAttribute('style') || '';
+    const styles = (_a = this.nativeElement.getAttribute('style')) !== null && _a !== void 0 ? _a : '';
     this.fallbackStyles = this.buildStyleMap(styles);
     this.isServer = serverLoaded && (0,_angular_common__WEBPACK_IMPORTED_MODULE_2__.isPlatformServer)(platformId);
   }
@@ -72183,7 +72629,11 @@ class StyleDirective extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_
 
   buildStyleMap(styles) {
     // Always safe-guard (aka sanitize) style property values
-    const sanitizer = val => this.sanitizer.sanitize(_angular_core__WEBPACK_IMPORTED_MODULE_1__.SecurityContext.STYLE, val) || '';
+    const sanitizer = val => {
+      var _a;
+
+      return (_a = this.sanitizer.sanitize(_angular_core__WEBPACK_IMPORTED_MODULE_1__.SecurityContext.STYLE, val)) !== null && _a !== void 0 ? _a : '';
+    };
 
     if (styles) {
       switch (getType(styles)) {
@@ -72448,8 +72898,13 @@ __webpack_require__.r(__webpack_exports__);
  */
 
 class LayoutStyleBuilder extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleBuilder {
-  buildStyles(input) {
-    return (0,_angular_flex_layout_private_utils__WEBPACK_IMPORTED_MODULE_1__.buildLayoutCSS)(input);
+  buildStyles(input, {
+    display
+  }) {
+    const css = (0,_angular_flex_layout_private_utils__WEBPACK_IMPORTED_MODULE_1__.buildLayoutCSS)(input);
+    return Object.assign(Object.assign({}, css), {
+      display: display === 'none' ? display : css.display
+    });
   }
 
 }
@@ -72492,17 +72947,33 @@ const selector$6 = `
  */
 
 class LayoutDirective extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.BaseDirective2 {
-  constructor(elRef, styleUtils, styleBuilder, marshal) {
+  constructor(elRef, styleUtils, styleBuilder, marshal, _config) {
     super(elRef, styleBuilder, styleUtils, marshal);
+    this._config = _config;
     this.DIRECTIVE_KEY = 'layout';
-    this.styleCache = layoutCache;
     this.init();
+  }
+
+  updateWithValue(input) {
+    var _a;
+
+    const detectLayoutDisplay = this._config.detectLayoutDisplay;
+    const display = detectLayoutDisplay ? this.styler.lookupStyle(this.nativeElement, 'display') : '';
+    this.styleCache = (_a = cacheMap.get(display)) !== null && _a !== void 0 ? _a : new Map();
+    cacheMap.set(display, this.styleCache);
+
+    if (this.currentValue !== input) {
+      this.addStyles(input, {
+        display
+      });
+      this.currentValue = input;
+    }
   }
 
 }
 
 LayoutDirective.ɵfac = function LayoutDirective_Factory(t) {
-  return new (t || LayoutDirective)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleUtils), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](LayoutStyleBuilder), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.MediaMarshaller));
+  return new (t || LayoutDirective)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleUtils), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](LayoutStyleBuilder), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.MediaMarshaller), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG));
 };
 
 LayoutDirective.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineDirective"]({
@@ -72522,6 +72993,12 @@ LayoutDirective.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2_
       type: LayoutStyleBuilder
     }, {
       type: _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.MediaMarshaller
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
+        args: [_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG]
+      }]
     }];
   }, null);
 })();
@@ -72573,7 +73050,7 @@ DefaultLayoutDirective.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MO
   }], null, null);
 })();
 
-const layoutCache = new Map();
+const cacheMap = new Map();
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -72590,14 +73067,16 @@ const CLEAR_MARGIN_CSS = {
 };
 
 class LayoutGapStyleBuilder extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleBuilder {
-  constructor(_styler) {
+  constructor(_styler, _config) {
     super();
     this._styler = _styler;
+    this._config = _config;
   }
 
   buildStyles(gapValue, parent) {
     if (gapValue.endsWith(GRID_SPECIFIER)) {
-      gapValue = gapValue.slice(0, gapValue.indexOf(GRID_SPECIFIER)); // Add the margin to the host element
+      gapValue = gapValue.slice(0, gapValue.indexOf(GRID_SPECIFIER));
+      gapValue = (0,_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵmultiply"])(gapValue, this._config.multiplier); // Add the margin to the host element
 
       return buildGridMargin(gapValue, parent.directionality);
     } else {
@@ -72609,12 +73088,15 @@ class LayoutGapStyleBuilder extends _angular_flex_layout_core__WEBPACK_IMPORTED_
     const items = parent.items;
 
     if (gapValue.endsWith(GRID_SPECIFIER)) {
-      gapValue = gapValue.slice(0, gapValue.indexOf(GRID_SPECIFIER)); // For each `element` children, set the padding
+      gapValue = gapValue.slice(0, gapValue.indexOf(GRID_SPECIFIER));
+      gapValue = (0,_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵmultiply"])(gapValue, this._config.multiplier); // For each `element` children, set the padding
 
       const paddingStyles = buildGridPadding(gapValue, parent.directionality);
 
       this._styler.applyStyleToElements(paddingStyles, parent.items);
     } else {
+      gapValue = (0,_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵmultiply"])(gapValue, this._config.multiplier);
+      gapValue = this.addFallbackUnit(gapValue);
       const lastItem = items.pop(); // For each `element` children EXCEPT the last,
       // set the margin right/bottom styles...
 
@@ -72627,10 +73109,14 @@ class LayoutGapStyleBuilder extends _angular_flex_layout_core__WEBPACK_IMPORTED_
     }
   }
 
+  addFallbackUnit(value) {
+    return !isNaN(+value) ? `${value}${this._config.defaultUnit}` : value;
+  }
+
 }
 
 LayoutGapStyleBuilder.ɵfac = function LayoutGapStyleBuilder_Factory(t) {
-  return new (t || LayoutGapStyleBuilder)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵinject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleUtils));
+  return new (t || LayoutGapStyleBuilder)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵinject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleUtils), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵinject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG));
 };
 
 LayoutGapStyleBuilder.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineInjectable"]({
@@ -72648,6 +73134,12 @@ LayoutGapStyleBuilder.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MO
   }], function () {
     return [{
       type: _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleUtils
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
+        args: [_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG]
+      }]
     }];
   }, null);
 })();
@@ -72896,7 +73388,7 @@ const GRID_SPECIFIER = ' grid';
 
 function buildGridPadding(value, directionality) {
   const [between, below] = value.split(' ');
-  const bottom = below || between;
+  const bottom = below !== null && below !== void 0 ? below : between;
   let paddingRight = '0px',
       paddingBottom = bottom,
       paddingLeft = '0px';
@@ -72914,7 +73406,7 @@ function buildGridPadding(value, directionality) {
 
 function buildGridMargin(value, directionality) {
   const [between, below] = value.split(' ');
-  const bottom = below || between;
+  const bottom = below !== null && below !== void 0 ? below : between;
 
   const minus = str => `-${str}`;
 
@@ -73499,35 +73991,35 @@ DefaultFlexOrderDirective.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED
 
 
 class FlexOffsetStyleBuilder extends _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.StyleBuilder {
-  buildStyles(offset, parent) {
-    if (offset === '') {
-      offset = '0';
-    }
+  constructor(_config) {
+    super();
+    this._config = _config;
+  }
 
+  buildStyles(offset, parent) {
+    offset || (offset = '0');
+    offset = (0,_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵmultiply"])(offset, this._config.multiplier);
     const isPercent = String(offset).indexOf('%') > -1;
     const isPx = String(offset).indexOf('px') > -1;
 
     if (!isPx && !isPercent && !isNaN(+offset)) {
-      offset = offset + '%';
+      offset = `${offset}%`;
     }
 
     const horizontalLayoutKey = parent.isRtl ? 'margin-right' : 'margin-left';
     const styles = (0,_angular_flex_layout_private_utils__WEBPACK_IMPORTED_MODULE_1__.isFlowHorizontal)(parent.layout) ? {
-      [horizontalLayoutKey]: `${offset}`
+      [horizontalLayoutKey]: offset
     } : {
-      'margin-top': `${offset}`
+      'margin-top': offset
     };
     return styles;
   }
 
 }
 
-FlexOffsetStyleBuilder.ɵfac = /* @__PURE__ */function () {
-  let ɵFlexOffsetStyleBuilder_BaseFactory;
-  return function FlexOffsetStyleBuilder_Factory(t) {
-    return (ɵFlexOffsetStyleBuilder_BaseFactory || (ɵFlexOffsetStyleBuilder_BaseFactory = _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵgetInheritedFactory"](FlexOffsetStyleBuilder)))(t || FlexOffsetStyleBuilder);
-  };
-}();
+FlexOffsetStyleBuilder.ɵfac = function FlexOffsetStyleBuilder_Factory(t) {
+  return new (t || FlexOffsetStyleBuilder)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵinject"](_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG));
+};
 
 FlexOffsetStyleBuilder.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineInjectable"]({
   token: FlexOffsetStyleBuilder,
@@ -73541,7 +74033,15 @@ FlexOffsetStyleBuilder.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_M
     args: [{
       providedIn: 'root'
     }]
-  }], null, null);
+  }], function () {
+    return [{
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
+        args: [_angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__.LAYOUT_CONFIG]
+      }]
+    }];
+  }, null);
 })();
 
 const inputs$2 = ['fxFlexOffset', 'fxFlexOffset.xs', 'fxFlexOffset.sm', 'fxFlexOffset.md', 'fxFlexOffset.lg', 'fxFlexOffset.xl', 'fxFlexOffset.lt-sm', 'fxFlexOffset.lt-md', 'fxFlexOffset.lt-lg', 'fxFlexOffset.lt-xl', 'fxFlexOffset.gt-xs', 'fxFlexOffset.gt-sm', 'fxFlexOffset.gt-md', 'fxFlexOffset.gt-lg'];
@@ -76305,6 +76805,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "ɵMatchMedia": () => (/* reexport safe */ _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵMatchMedia"]),
 /* harmony export */   "ɵMockMatchMedia": () => (/* reexport safe */ _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵMockMatchMedia"]),
 /* harmony export */   "ɵMockMatchMediaProvider": () => (/* reexport safe */ _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵMockMatchMediaProvider"]),
+/* harmony export */   "ɵmultiply": () => (/* reexport safe */ _angular_flex_layout_core__WEBPACK_IMPORTED_MODULE_0__["ɵmultiply"]),
 /* harmony export */   "ClassDirective": () => (/* reexport safe */ _angular_flex_layout_extended__WEBPACK_IMPORTED_MODULE_1__.ClassDirective),
 /* harmony export */   "DefaultClassDirective": () => (/* reexport safe */ _angular_flex_layout_extended__WEBPACK_IMPORTED_MODULE_1__.DefaultClassDirective),
 /* harmony export */   "DefaultImgSrcDirective": () => (/* reexport safe */ _angular_flex_layout_extended__WEBPACK_IMPORTED_MODULE_1__.DefaultImgSrcDirective),
@@ -76404,7 +76905,7 @@ __webpack_require__.r(__webpack_exports__);
 
 /** Current version of Angular Flex-Layout. */
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_4__.Version('13.0.0-beta.36');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_4__.Version('13.0.0-beta.38');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -85843,7 +86344,7 @@ __webpack_require__.r(__webpack_exports__);
 
 const _c0 = ["mat-button", ""];
 const _c1 = ["*"];
-const _c2 = ".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n";
+const _c2 = ".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n";
 const DEFAULT_ROUND_BUTTON_COLOR = 'accent';
 /**
  * List of classes to add to MatButton instances based on host attributes to
@@ -85981,7 +86482,7 @@ MatButton.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
     }
   },
   directives: [_angular_material_core__WEBPACK_IMPORTED_MODULE_0__.MatRipple],
-  styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"],
+  styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -86007,7 +86508,7 @@ MatButton.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewEncapsulation.None,
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectionStrategy.OnPush,
       template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span>\n<span matRipple class=\"mat-button-ripple\"\n      [class.mat-button-ripple-round]=\"isRoundButton || isIconButton\"\n      [matRippleDisabled]=\"_isRippleDisabled()\"\n      [matRippleCentered]=\"isIconButton\"\n      [matRippleTrigger]=\"_getHostElement()\"></span>\n<span class=\"mat-button-focus-overlay\"></span>\n",
-      styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"]
+      styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"]
     }]
   }], function () {
     return [{
@@ -86036,22 +86537,44 @@ MatButton.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
 
 
 class MatAnchor extends MatButton {
-  constructor(focusMonitor, elementRef, animationMode) {
+  constructor(focusMonitor, elementRef, animationMode,
+  /** @breaking-change 14.0.0 _ngZone will be required. */
+  _ngZone) {
     super(elementRef, focusMonitor, animationMode);
+    this._ngZone = _ngZone;
+
+    this._haltDisabledEvents = event => {
+      // A disabled button shouldn't apply any actions
+      if (this.disabled) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
   }
 
-  _haltDisabledEvents(event) {
-    // A disabled button shouldn't apply any actions
-    if (this.disabled) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+  ngAfterViewInit() {
+    super.ngAfterViewInit();
+    /** @breaking-change 14.0.0 _ngZone will be required. */
+
+    if (this._ngZone) {
+      this._ngZone.runOutsideAngular(() => {
+        this._elementRef.nativeElement.addEventListener('click', this._haltDisabledEvents);
+      });
+    } else {
+      this._elementRef.nativeElement.addEventListener('click', this._haltDisabledEvents);
     }
+  }
+
+  ngOnDestroy() {
+    super.ngOnDestroy();
+
+    this._elementRef.nativeElement.removeEventListener('click', this._haltDisabledEvents);
   }
 
 }
 
 MatAnchor.ɵfac = function MatAnchor_Factory(t) {
-  return new (t || MatAnchor)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_2__.FocusMonitor), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_3__.ANIMATION_MODULE_TYPE, 8));
+  return new (t || MatAnchor)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_2__.FocusMonitor), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_3__.ANIMATION_MODULE_TYPE, 8), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone, 8));
 };
 
 MatAnchor.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineComponent"]({
@@ -86060,14 +86583,8 @@ MatAnchor.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
   hostAttrs: [1, "mat-focus-indicator"],
   hostVars: 7,
   hostBindings: function MatAnchor_HostBindings(rf, ctx) {
-    if (rf & 1) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵlistener"]("click", function MatAnchor_click_HostBindingHandler($event) {
-        return ctx._haltDisabledEvents($event);
-      });
-    }
-
     if (rf & 2) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵattribute"]("tabindex", ctx.disabled ? -1 : ctx.tabIndex || 0)("disabled", ctx.disabled || null)("aria-disabled", ctx.disabled.toString());
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵattribute"]("tabindex", ctx.disabled ? -1 : ctx.tabIndex)("disabled", ctx.disabled || null)("aria-disabled", ctx.disabled.toString());
       _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵclassProp"]("_mat-animation-noopable", ctx._animationMode === "NoopAnimations")("mat-button-disabled", ctx.disabled);
     }
   },
@@ -86117,10 +86634,9 @@ MatAnchor.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
         // Note that we ignore the user-specified tabindex when it's disabled for
         // consistency with the `mat-button` applied on native buttons where even
         // though they have an index, they're not tabbable.
-        '[attr.tabindex]': 'disabled ? -1 : (tabIndex || 0)',
+        '[attr.tabindex]': 'disabled ? -1 : tabIndex',
         '[attr.disabled]': 'disabled || null',
         '[attr.aria-disabled]': 'disabled.toString()',
-        '(click)': '_haltDisabledEvents($event)',
         '[class._mat-animation-noopable]': '_animationMode === "NoopAnimations"',
         '[class.mat-button-disabled]': 'disabled',
         'class': 'mat-focus-indicator'
@@ -86129,7 +86645,7 @@ MatAnchor.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewEncapsulation.None,
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectionStrategy.OnPush,
       template: "<span class=\"mat-button-wrapper\"><ng-content></ng-content></span>\n<span matRipple class=\"mat-button-ripple\"\n      [class.mat-button-ripple-round]=\"isRoundButton || isIconButton\"\n      [matRippleDisabled]=\"_isRippleDisabled()\"\n      [matRippleCentered]=\"isIconButton\"\n      [matRippleTrigger]=\"_getHostElement()\"></span>\n<span class=\"mat-button-focus-overlay\"></span>\n",
-      styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"]
+      styles: [".mat-button .mat-button-focus-overlay,.mat-icon-button .mat-button-focus-overlay{opacity:0}.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:.04}@media(hover: none){.mat-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay,.mat-stroked-button:hover:not(.mat-button-disabled) .mat-button-focus-overlay{opacity:0}}.mat-button,.mat-icon-button,.mat-stroked-button,.mat-flat-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-button.mat-button-disabled,.mat-icon-button.mat-button-disabled,.mat-stroked-button.mat-button-disabled,.mat-flat-button.mat-button-disabled{cursor:default}.mat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-button.cdk-program-focused .mat-button-focus-overlay,.mat-icon-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-icon-button.cdk-program-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-stroked-button.cdk-program-focused .mat-button-focus-overlay,.mat-flat-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-flat-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-button::-moz-focus-inner,.mat-icon-button::-moz-focus-inner,.mat-stroked-button::-moz-focus-inner,.mat-flat-button::-moz-focus-inner{border:0}.mat-raised-button{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1)}.mat-raised-button::-moz-focus-inner{border:0}.mat-raised-button.mat-button-disabled{cursor:default}.mat-raised-button.cdk-keyboard-focused .mat-button-focus-overlay,.mat-raised-button.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-raised-button::-moz-focus-inner{border:0}._mat-animation-noopable.mat-raised-button{transition:none;animation:none}.mat-stroked-button{border:1px solid currentColor;padding:0 15px;line-height:34px}.mat-stroked-button .mat-button-ripple.mat-ripple,.mat-stroked-button .mat-button-focus-overlay{top:-1px;left:-1px;right:-1px;bottom:-1px}.mat-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:56px;height:56px;padding:0;flex-shrink:0}.mat-fab::-moz-focus-inner{border:0}.mat-fab.mat-button-disabled{cursor:default}.mat-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-fab{transition:none;animation:none}.mat-fab .mat-button-wrapper{padding:16px 0;display:inline-block;line-height:24px}.mat-mini-fab{box-sizing:border-box;position:relative;-webkit-user-select:none;user-select:none;cursor:pointer;outline:none;border:none;-webkit-tap-highlight-color:transparent;display:inline-block;white-space:nowrap;text-decoration:none;vertical-align:baseline;text-align:center;margin:0;min-width:64px;line-height:36px;padding:0 16px;border-radius:4px;overflow:visible;transform:translate3d(0, 0, 0);transition:background 400ms cubic-bezier(0.25, 0.8, 0.25, 1),box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);min-width:0;border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0}.mat-mini-fab::-moz-focus-inner{border:0}.mat-mini-fab.mat-button-disabled{cursor:default}.mat-mini-fab.cdk-keyboard-focused .mat-button-focus-overlay,.mat-mini-fab.cdk-program-focused .mat-button-focus-overlay{opacity:.12}.mat-mini-fab::-moz-focus-inner{border:0}._mat-animation-noopable.mat-mini-fab{transition:none;animation:none}.mat-mini-fab .mat-button-wrapper{padding:8px 0;display:inline-block;line-height:24px}.mat-icon-button{padding:0;min-width:0;width:40px;height:40px;flex-shrink:0;line-height:40px;border-radius:50%}.mat-icon-button i,.mat-icon-button .mat-icon{line-height:24px}.mat-button-ripple.mat-ripple,.mat-button-focus-overlay{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none;border-radius:inherit}.mat-button-ripple.mat-ripple:not(:empty){transform:translateZ(0)}.mat-button-focus-overlay{opacity:0;transition:opacity 200ms cubic-bezier(0.35, 0, 0.25, 1),background-color 200ms cubic-bezier(0.35, 0, 0.25, 1)}._mat-animation-noopable .mat-button-focus-overlay{transition:none}.mat-button-ripple-round{border-radius:50%;z-index:1}.mat-button .mat-button-wrapper>*,.mat-flat-button .mat-button-wrapper>*,.mat-stroked-button .mat-button-wrapper>*,.mat-raised-button .mat-button-wrapper>*,.mat-icon-button .mat-button-wrapper>*,.mat-fab .mat-button-wrapper>*,.mat-mini-fab .mat-button-wrapper>*{vertical-align:middle}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button{display:inline-flex;justify-content:center;align-items:center;font-size:inherit;width:2.5em;height:2.5em}.cdk-high-contrast-active .mat-button,.cdk-high-contrast-active .mat-flat-button,.cdk-high-contrast-active .mat-raised-button,.cdk-high-contrast-active .mat-icon-button,.cdk-high-contrast-active .mat-fab,.cdk-high-contrast-active .mat-mini-fab{outline:solid 1px}.cdk-high-contrast-active .mat-button-base.cdk-keyboard-focused,.cdk-high-contrast-active .mat-button-base.cdk-program-focused{outline:solid 3px}\n"]
     }]
   }], function () {
     return [{
@@ -86143,6 +86659,11 @@ MatAnchor.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵ�
       }, {
         type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
         args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_3__.ANIMATION_MODULE_TYPE]
+      }]
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
       }]
     }];
   }, {
@@ -86640,7 +87161,7 @@ MatCard.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵd
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵprojection"](1, 1);
     }
   },
-  styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);display:block;position:relative;padding:16px;border-radius:4px}._mat-animation-noopable.mat-card{transition:none;animation:none}.mat-card .mat-divider-horizontal{position:absolute;left:0;width:100%}[dir=rtl] .mat-card .mat-divider-horizontal{left:auto;right:0}.mat-card .mat-divider-horizontal.mat-divider-inset{position:static;margin:0}[dir=rtl] .mat-card .mat-divider-horizontal.mat-divider-inset{margin-right:0}.cdk-high-contrast-active .mat-card{outline:solid 1px}.mat-card-actions,.mat-card-subtitle,.mat-card-content{display:block;margin-bottom:16px}.mat-card-title{display:block;margin-bottom:8px}.mat-card-actions{margin-left:-8px;margin-right:-8px;padding:8px 0}.mat-card-actions-align-end{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 32px);margin:0 -16px 16px -16px}.mat-card-footer{display:block;margin:0 -16px -16px -16px}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button,.mat-card-actions .mat-stroked-button{margin:0 8px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header .mat-card-title{margin-bottom:12px}.mat-card-header-text{margin:0 16px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0;object-fit:cover}.mat-card-title-group{display:flex;justify-content:space-between}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-title-group>.mat-card-xl-image{margin:-8px 0 8px}@media(max-width: 599px){.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}}.mat-card>:first-child,.mat-card-content>:first-child{margin-top:0}.mat-card>:last-child:not(.mat-card-footer),.mat-card-content>:last-child:not(.mat-card-footer){margin-bottom:0}.mat-card-image:first-child{margin-top:-16px;border-top-left-radius:inherit;border-top-right-radius:inherit}.mat-card>.mat-card-actions:last-child{margin-bottom:-8px;padding-bottom:0}.mat-card-actions:not(.mat-card-actions-align-end) .mat-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-raised-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-stroked-button:first-child{margin-left:0;margin-right:0}.mat-card-actions-align-end .mat-button:last-child,.mat-card-actions-align-end .mat-raised-button:last-child,.mat-card-actions-align-end .mat-stroked-button:last-child{margin-left:0;margin-right:0}.mat-card-title:not(:first-child),.mat-card-subtitle:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px}\n"],
+  styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);display:block;position:relative;padding:16px;border-radius:4px}._mat-animation-noopable.mat-card{transition:none;animation:none}.mat-card .mat-divider-horizontal{position:absolute;left:0;width:100%}[dir=rtl] .mat-card .mat-divider-horizontal{left:auto;right:0}.mat-card .mat-divider-horizontal.mat-divider-inset{position:static;margin:0}[dir=rtl] .mat-card .mat-divider-horizontal.mat-divider-inset{margin-right:0}.cdk-high-contrast-active .mat-card{outline:solid 1px}.mat-card-actions,.mat-card-subtitle,.mat-card-content{display:block;margin-bottom:16px}.mat-card-title{display:block;margin-bottom:8px}.mat-card-actions{margin-left:-8px;margin-right:-8px;padding:8px 0}.mat-card-actions-align-end{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 32px);margin:0 -16px 16px -16px;display:block;overflow:hidden}.mat-card-image img{width:100%}.mat-card-footer{display:block;margin:0 -16px -16px -16px}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button,.mat-card-actions .mat-stroked-button{margin:0 8px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header .mat-card-title{margin-bottom:12px}.mat-card-header-text{margin:0 16px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0;object-fit:cover}.mat-card-title-group{display:flex;justify-content:space-between}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-title-group>.mat-card-xl-image{margin:-8px 0 8px}@media(max-width: 599px){.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}}.mat-card>:first-child,.mat-card-content>:first-child{margin-top:0}.mat-card>:last-child:not(.mat-card-footer),.mat-card-content>:last-child:not(.mat-card-footer){margin-bottom:0}.mat-card-image:first-child{margin-top:-16px;border-top-left-radius:inherit;border-top-right-radius:inherit}.mat-card>.mat-card-actions:last-child{margin-bottom:-8px;padding-bottom:0}.mat-card-actions:not(.mat-card-actions-align-end) .mat-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-raised-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-stroked-button:first-child{margin-left:0;margin-right:0}.mat-card-actions-align-end .mat-button:last-child,.mat-card-actions-align-end .mat-raised-button:last-child,.mat-card-actions-align-end .mat-stroked-button:last-child{margin-left:0;margin-right:0}.mat-card-title:not(:first-child),.mat-card-subtitle:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -86658,7 +87179,7 @@ MatCard.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵd
         '[class._mat-animation-noopable]': '_animationMode === "NoopAnimations"'
       },
       template: "<ng-content></ng-content>\n<ng-content select=\"mat-card-footer\"></ng-content>\n",
-      styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);display:block;position:relative;padding:16px;border-radius:4px}._mat-animation-noopable.mat-card{transition:none;animation:none}.mat-card .mat-divider-horizontal{position:absolute;left:0;width:100%}[dir=rtl] .mat-card .mat-divider-horizontal{left:auto;right:0}.mat-card .mat-divider-horizontal.mat-divider-inset{position:static;margin:0}[dir=rtl] .mat-card .mat-divider-horizontal.mat-divider-inset{margin-right:0}.cdk-high-contrast-active .mat-card{outline:solid 1px}.mat-card-actions,.mat-card-subtitle,.mat-card-content{display:block;margin-bottom:16px}.mat-card-title{display:block;margin-bottom:8px}.mat-card-actions{margin-left:-8px;margin-right:-8px;padding:8px 0}.mat-card-actions-align-end{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 32px);margin:0 -16px 16px -16px}.mat-card-footer{display:block;margin:0 -16px -16px -16px}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button,.mat-card-actions .mat-stroked-button{margin:0 8px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header .mat-card-title{margin-bottom:12px}.mat-card-header-text{margin:0 16px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0;object-fit:cover}.mat-card-title-group{display:flex;justify-content:space-between}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-title-group>.mat-card-xl-image{margin:-8px 0 8px}@media(max-width: 599px){.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}}.mat-card>:first-child,.mat-card-content>:first-child{margin-top:0}.mat-card>:last-child:not(.mat-card-footer),.mat-card-content>:last-child:not(.mat-card-footer){margin-bottom:0}.mat-card-image:first-child{margin-top:-16px;border-top-left-radius:inherit;border-top-right-radius:inherit}.mat-card>.mat-card-actions:last-child{margin-bottom:-8px;padding-bottom:0}.mat-card-actions:not(.mat-card-actions-align-end) .mat-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-raised-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-stroked-button:first-child{margin-left:0;margin-right:0}.mat-card-actions-align-end .mat-button:last-child,.mat-card-actions-align-end .mat-raised-button:last-child,.mat-card-actions-align-end .mat-stroked-button:last-child{margin-left:0;margin-right:0}.mat-card-title:not(:first-child),.mat-card-subtitle:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px}\n"]
+      styles: [".mat-card{transition:box-shadow 280ms cubic-bezier(0.4, 0, 0.2, 1);display:block;position:relative;padding:16px;border-radius:4px}._mat-animation-noopable.mat-card{transition:none;animation:none}.mat-card .mat-divider-horizontal{position:absolute;left:0;width:100%}[dir=rtl] .mat-card .mat-divider-horizontal{left:auto;right:0}.mat-card .mat-divider-horizontal.mat-divider-inset{position:static;margin:0}[dir=rtl] .mat-card .mat-divider-horizontal.mat-divider-inset{margin-right:0}.cdk-high-contrast-active .mat-card{outline:solid 1px}.mat-card-actions,.mat-card-subtitle,.mat-card-content{display:block;margin-bottom:16px}.mat-card-title{display:block;margin-bottom:8px}.mat-card-actions{margin-left:-8px;margin-right:-8px;padding:8px 0}.mat-card-actions-align-end{display:flex;justify-content:flex-end}.mat-card-image{width:calc(100% + 32px);margin:0 -16px 16px -16px;display:block;overflow:hidden}.mat-card-image img{width:100%}.mat-card-footer{display:block;margin:0 -16px -16px -16px}.mat-card-actions .mat-button,.mat-card-actions .mat-raised-button,.mat-card-actions .mat-stroked-button{margin:0 8px}.mat-card-header{display:flex;flex-direction:row}.mat-card-header .mat-card-title{margin-bottom:12px}.mat-card-header-text{margin:0 16px}.mat-card-avatar{height:40px;width:40px;border-radius:50%;flex-shrink:0;object-fit:cover}.mat-card-title-group{display:flex;justify-content:space-between}.mat-card-sm-image{width:80px;height:80px}.mat-card-md-image{width:112px;height:112px}.mat-card-lg-image{width:152px;height:152px}.mat-card-xl-image{width:240px;height:240px;margin:-8px}.mat-card-title-group>.mat-card-xl-image{margin:-8px 0 8px}@media(max-width: 599px){.mat-card-title-group{margin:0}.mat-card-xl-image{margin-left:0;margin-right:0}}.mat-card>:first-child,.mat-card-content>:first-child{margin-top:0}.mat-card>:last-child:not(.mat-card-footer),.mat-card-content>:last-child:not(.mat-card-footer){margin-bottom:0}.mat-card-image:first-child{margin-top:-16px;border-top-left-radius:inherit;border-top-right-radius:inherit}.mat-card>.mat-card-actions:last-child{margin-bottom:-8px;padding-bottom:0}.mat-card-actions:not(.mat-card-actions-align-end) .mat-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-raised-button:first-child,.mat-card-actions:not(.mat-card-actions-align-end) .mat-stroked-button:first-child{margin-left:0;margin-right:0}.mat-card-actions-align-end .mat-button:last-child,.mat-card-actions-align-end .mat-raised-button:last-child,.mat-card-actions-align-end .mat-stroked-button:last-child{margin-left:0;margin-right:0}.mat-card-title:not(:first-child),.mat-card-subtitle:not(:first-child){margin-top:-4px}.mat-card-header .mat-card-subtitle:not(:first-child){margin-top:-8px}.mat-card>.mat-card-xl-image:first-child{margin-top:-8px}.mat-card>.mat-card-xl-image:last-child{margin-bottom:-8px}\n"]
     }]
   }], function () {
     return [{
@@ -86863,7 +87384,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "RippleRef": () => (/* binding */ RippleRef),
 /* harmony export */   "RippleRenderer": () => (/* binding */ RippleRenderer),
 /* harmony export */   "ShowOnDirtyErrorStateMatcher": () => (/* binding */ ShowOnDirtyErrorStateMatcher),
-/* harmony export */   "VERSION": () => (/* binding */ VERSION$1),
+/* harmony export */   "VERSION": () => (/* binding */ VERSION),
 /* harmony export */   "_MatOptgroupBase": () => (/* binding */ _MatOptgroupBase),
 /* harmony export */   "_MatOptionBase": () => (/* binding */ _MatOptionBase),
 /* harmony export */   "_countGroupLabelsBeforeOption": () => (/* binding */ _countGroupLabelsBeforeOption),
@@ -86943,7 +87464,7 @@ function MatOption_span_3_Template(rf, ctx) {
 }
 
 const _c2 = ["*"];
-const VERSION$1 = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.3.9');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -86966,12 +87487,7 @@ class AnimationDurations {}
 
 AnimationDurations.COMPLEX = '375ms';
 AnimationDurations.ENTERING = '225ms';
-AnimationDurations.EXITING = '195ms'; // Private version constant to circumvent test/build issues,
-// i.e. avoid core to depend on the @angular/material primary entry-point
-// Can be removed once the Material primary entry-point no longer
-// re-exports all secondary entry-points
-
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
+AnimationDurations.EXITING = '195ms';
 /** @docs-private */
 
 function MATERIAL_SANITY_CHECKS_FACTORY() {
@@ -87831,15 +88347,13 @@ NativeDateModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0
   providers: [{
     provide: DateAdapter,
     useClass: NativeDateAdapter
-  }],
-  imports: [[_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.PlatformModule]]
+  }]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](NativeDateModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.PlatformModule],
       providers: [{
         provide: DateAdapter,
         useClass: NativeDateAdapter
@@ -88630,14 +89144,14 @@ MatRippleModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0_
   type: MatRippleModule
 });
 MatRippleModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({
-  imports: [[MatCommonModule, _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.PlatformModule], MatCommonModule]
+  imports: [[MatCommonModule], MatCommonModule]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MatRippleModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [MatCommonModule, _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.PlatformModule],
+      imports: [MatCommonModule],
       exports: [MatRipple, MatCommonModule],
       declarations: [MatRipple]
     }]
@@ -88773,6 +89287,14 @@ MatPseudoCheckboxModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_M
     }]
   }], null, null);
 })();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -88926,7 +89448,7 @@ MatOptgroup.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["�
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtextInterpolate1"]("", ctx.label, " ");
     }
   },
-  styles: [".mat-optgroup-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:default}.mat-optgroup-label[disabled]{cursor:default}[dir=rtl] .mat-optgroup-label{text-align:right}.mat-optgroup-label .mat-icon{margin-right:16px;vertical-align:middle}.mat-optgroup-label .mat-icon svg{vertical-align:top}[dir=rtl] .mat-optgroup-label .mat-icon{margin-left:16px;margin-right:0}\n"],
+  styles: [".mat-optgroup-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;-webkit-user-select:none;user-select:none;cursor:default}.mat-optgroup-label[disabled]{cursor:default}[dir=rtl] .mat-optgroup-label{text-align:right}.mat-optgroup-label .mat-icon{margin-right:16px;vertical-align:middle}.mat-optgroup-label .mat-icon svg{vertical-align:top}[dir=rtl] .mat-optgroup-label .mat-icon{margin-left:16px;margin-right:0}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -88952,7 +89474,7 @@ MatOptgroup.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["�
         useExisting: MatOptgroup
       }],
       template: "<span class=\"mat-optgroup-label\" aria-hidden=\"true\" [id]=\"_labelId\">{{ label }} <ng-content></ng-content></span>\n<ng-content select=\"mat-option, ng-container\"></ng-content>\n",
-      styles: [".mat-optgroup-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:default}.mat-optgroup-label[disabled]{cursor:default}[dir=rtl] .mat-optgroup-label{text-align:right}.mat-optgroup-label .mat-icon{margin-right:16px;vertical-align:middle}.mat-optgroup-label .mat-icon svg{vertical-align:top}[dir=rtl] .mat-optgroup-label .mat-icon{margin-left:16px;margin-right:0}\n"]
+      styles: [".mat-optgroup-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;-webkit-user-select:none;user-select:none;cursor:default}.mat-optgroup-label[disabled]{cursor:default}[dir=rtl] .mat-optgroup-label{text-align:right}.mat-optgroup-label .mat-icon{margin-right:16px;vertical-align:middle}.mat-optgroup-label .mat-icon svg{vertical-align:top}[dir=rtl] .mat-optgroup-label .mat-icon{margin-left:16px;margin-right:0}\n"]
     }]
   }], null, null);
 })();
@@ -89309,8 +89831,8 @@ MatOption.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵ�
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matRippleTrigger", ctx._getHostElement())("matRippleDisabled", ctx.disabled || ctx.disableRipple);
     }
   },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_3__.NgIf, MatRipple, MatPseudoCheckbox],
-  styles: [".mat-option{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;position:relative;cursor:pointer;outline:none;display:flex;flex-direction:row;max-width:100%;box-sizing:border-box;align-items:center;-webkit-tap-highlight-color:transparent}.mat-option[disabled]{cursor:default}[dir=rtl] .mat-option{text-align:right}.mat-option .mat-icon{margin-right:16px;vertical-align:middle}.mat-option .mat-icon svg{vertical-align:top}[dir=rtl] .mat-option .mat-icon{margin-left:16px;margin-right:0}.mat-option[aria-disabled=true]{-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:default}.mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:32px}[dir=rtl] .mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:16px;padding-right:32px}.cdk-high-contrast-active .mat-option{margin:0 1px}.cdk-high-contrast-active .mat-option.mat-active{border:solid 1px currentColor;margin:0}.cdk-high-contrast-active .mat-option[aria-disabled=true]{opacity:.5}.mat-option-text{display:inline-block;flex-grow:1;overflow:hidden;text-overflow:ellipsis}.mat-option .mat-option-ripple{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none}.mat-option-pseudo-checkbox{margin-right:8px}[dir=rtl] .mat-option-pseudo-checkbox{margin-left:8px;margin-right:0}\n"],
+  directives: [MatPseudoCheckbox, _angular_common__WEBPACK_IMPORTED_MODULE_3__.NgIf, MatRipple],
+  styles: [".mat-option{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;position:relative;cursor:pointer;outline:none;display:flex;flex-direction:row;max-width:100%;box-sizing:border-box;align-items:center;-webkit-tap-highlight-color:transparent}.mat-option[disabled]{cursor:default}[dir=rtl] .mat-option{text-align:right}.mat-option .mat-icon{margin-right:16px;vertical-align:middle}.mat-option .mat-icon svg{vertical-align:top}[dir=rtl] .mat-option .mat-icon{margin-left:16px;margin-right:0}.mat-option[aria-disabled=true]{-webkit-user-select:none;user-select:none;cursor:default}.mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:32px}[dir=rtl] .mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:16px;padding-right:32px}.cdk-high-contrast-active .mat-option{margin:0 1px}.cdk-high-contrast-active .mat-option.mat-active{border:solid 1px currentColor;margin:0}.cdk-high-contrast-active .mat-option[aria-disabled=true]{opacity:.5}.mat-option-text{display:inline-block;flex-grow:1;overflow:hidden;text-overflow:ellipsis}.mat-option .mat-option-ripple{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none}.mat-option-pseudo-checkbox{margin-right:8px}[dir=rtl] .mat-option-pseudo-checkbox{margin-left:8px;margin-right:0}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -89338,7 +89860,7 @@ MatOption.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵ�
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewEncapsulation.None,
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectionStrategy.OnPush,
       template: "<mat-pseudo-checkbox *ngIf=\"multiple\" class=\"mat-option-pseudo-checkbox\"\n    [state]=\"selected ? 'checked' : 'unchecked'\" [disabled]=\"disabled\"></mat-pseudo-checkbox>\n\n<span class=\"mat-option-text\"><ng-content></ng-content></span>\n\n<!-- See a11y notes inside optgroup.ts for context behind this element. -->\n<span class=\"cdk-visually-hidden\" *ngIf=\"group && group._inert\">({{ group.label }})</span>\n\n<div class=\"mat-option-ripple\" mat-ripple\n     [matRippleTrigger]=\"_getHostElement()\"\n     [matRippleDisabled]=\"disabled || disableRipple\">\n</div>\n",
-      styles: [".mat-option{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;position:relative;cursor:pointer;outline:none;display:flex;flex-direction:row;max-width:100%;box-sizing:border-box;align-items:center;-webkit-tap-highlight-color:transparent}.mat-option[disabled]{cursor:default}[dir=rtl] .mat-option{text-align:right}.mat-option .mat-icon{margin-right:16px;vertical-align:middle}.mat-option .mat-icon svg{vertical-align:top}[dir=rtl] .mat-option .mat-icon{margin-left:16px;margin-right:0}.mat-option[aria-disabled=true]{-webkit-user-select:none;-moz-user-select:none;user-select:none;cursor:default}.mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:32px}[dir=rtl] .mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:16px;padding-right:32px}.cdk-high-contrast-active .mat-option{margin:0 1px}.cdk-high-contrast-active .mat-option.mat-active{border:solid 1px currentColor;margin:0}.cdk-high-contrast-active .mat-option[aria-disabled=true]{opacity:.5}.mat-option-text{display:inline-block;flex-grow:1;overflow:hidden;text-overflow:ellipsis}.mat-option .mat-option-ripple{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none}.mat-option-pseudo-checkbox{margin-right:8px}[dir=rtl] .mat-option-pseudo-checkbox{margin-left:8px;margin-right:0}\n"]
+      styles: [".mat-option{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:48px;height:48px;padding:0 16px;text-align:left;text-decoration:none;max-width:100%;position:relative;cursor:pointer;outline:none;display:flex;flex-direction:row;max-width:100%;box-sizing:border-box;align-items:center;-webkit-tap-highlight-color:transparent}.mat-option[disabled]{cursor:default}[dir=rtl] .mat-option{text-align:right}.mat-option .mat-icon{margin-right:16px;vertical-align:middle}.mat-option .mat-icon svg{vertical-align:top}[dir=rtl] .mat-option .mat-icon{margin-left:16px;margin-right:0}.mat-option[aria-disabled=true]{-webkit-user-select:none;user-select:none;cursor:default}.mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:32px}[dir=rtl] .mat-optgroup .mat-option:not(.mat-option-multiple){padding-left:16px;padding-right:32px}.cdk-high-contrast-active .mat-option{margin:0 1px}.cdk-high-contrast-active .mat-option.mat-active{border:solid 1px currentColor;margin:0}.cdk-high-contrast-active .mat-option[aria-disabled=true]{opacity:.5}.mat-option-text{display:inline-block;flex-grow:1;overflow:hidden;text-overflow:ellipsis}.mat-option .mat-option-ripple{top:0;left:0;right:0;bottom:0;position:absolute;pointer-events:none}.mat-option-pseudo-checkbox{margin-right:8px}[dir=rtl] .mat-option-pseudo-checkbox{margin-left:8px;margin-right:0}\n"]
     }]
   }], function () {
     return [{
@@ -90496,13 +91018,22 @@ class MatFormField extends _MatFormFieldBase {
 
   updateOutlineGap() {
     const labelEl = this._label ? this._label.nativeElement : null;
+    const container = this._connectionContainerRef.nativeElement;
+    const outlineStartSelector = '.mat-form-field-outline-start';
+    const outlineGapSelector = '.mat-form-field-outline-gap'; // getBoundingClientRect isn't available on the server.
 
-    if (this.appearance !== 'outline' || !labelEl || !labelEl.children.length || !labelEl.textContent.trim()) {
+    if (this.appearance !== 'outline' || !this._platform.isBrowser) {
       return;
-    }
+    } // If there is no content, set the gap elements to zero.
 
-    if (!this._platform.isBrowser) {
-      // getBoundingClientRect isn't available on the server.
+
+    if (!labelEl || !labelEl.children.length || !labelEl.textContent.trim()) {
+      const gapElements = container.querySelectorAll(`${outlineStartSelector}, ${outlineGapSelector}`);
+
+      for (let i = 0; i < gapElements.length; i++) {
+        gapElements[i].style.width = '0';
+      }
+
       return;
     } // If the element is not present in the DOM, the outline gap will need to be calculated
     // the next time it is checked and in the DOM.
@@ -90515,9 +91046,8 @@ class MatFormField extends _MatFormFieldBase {
 
     let startWidth = 0;
     let gapWidth = 0;
-    const container = this._connectionContainerRef.nativeElement;
-    const startEls = container.querySelectorAll('.mat-form-field-outline-start');
-    const gapEls = container.querySelectorAll('.mat-form-field-outline-gap');
+    const startEls = container.querySelectorAll(outlineStartSelector);
+    const gapEls = container.querySelectorAll(outlineGapSelector);
 
     if (this._label && this._label.nativeElement.children.length) {
       const containerRect = container.getBoundingClientRect(); // If the container's width and height are zero, it means that the element is
@@ -90702,8 +91232,8 @@ MatFormField.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitchCase", "hint");
     }
   },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.NgIf, _angular_common__WEBPACK_IMPORTED_MODULE_13__.NgSwitch, _angular_common__WEBPACK_IMPORTED_MODULE_13__.NgSwitchCase, _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_14__.CdkObserveContent],
-  styles: [".mat-form-field{display:inline-block;position:relative;text-align:left}[dir=rtl] .mat-form-field{text-align:right}.mat-form-field-wrapper{position:relative}.mat-form-field-flex{display:inline-flex;align-items:baseline;box-sizing:border-box;width:100%}.mat-form-field-prefix,.mat-form-field-suffix{white-space:nowrap;flex:none;position:relative}.mat-form-field-infix{display:block;position:relative;flex:auto;min-width:0;width:180px}.cdk-high-contrast-active .mat-form-field-infix{border-image:linear-gradient(transparent, transparent)}.mat-form-field-label-wrapper{position:absolute;left:0;box-sizing:content-box;width:100%;height:100%;overflow:hidden;pointer-events:none}[dir=rtl] .mat-form-field-label-wrapper{left:auto;right:0}.mat-form-field-label{position:absolute;left:0;font:inherit;pointer-events:none;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform-origin:0 0;transition:transform 400ms cubic-bezier(0.25, 0.8, 0.25, 1),color 400ms cubic-bezier(0.25, 0.8, 0.25, 1),width 400ms cubic-bezier(0.25, 0.8, 0.25, 1);display:none}[dir=rtl] .mat-form-field-label{transform-origin:100% 0;left:auto;right:0}.mat-form-field-empty.mat-form-field-label,.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-label{display:block}.mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:block;transition:none}.mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-form-field-can-float .mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:block}.mat-form-field-label:not(.mat-form-field-empty){transition:none}.mat-form-field-underline{position:absolute;width:100%;pointer-events:none;transform:scale3d(1, 1.0001, 1)}.mat-form-field-ripple{position:absolute;left:0;width:100%;transform-origin:50%;transform:scaleX(0.5);opacity:0;transition:background-color 300ms cubic-bezier(0.55, 0, 0.55, 0.2)}.mat-form-field.mat-focused .mat-form-field-ripple,.mat-form-field.mat-form-field-invalid .mat-form-field-ripple{opacity:1;transform:none;transition:transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1),opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1),background-color 300ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-subscript-wrapper{position:absolute;box-sizing:border-box;width:100%;overflow:hidden}.mat-form-field-subscript-wrapper .mat-icon,.mat-form-field-label-wrapper .mat-icon{width:1em;height:1em;font-size:inherit;vertical-align:baseline}.mat-form-field-hint-wrapper{display:flex}.mat-form-field-hint-spacer{flex:1 0 1em}.mat-error{display:block}.mat-form-field-control-wrapper{position:relative}.mat-form-field-hint-end{order:1}.mat-form-field._mat-animation-noopable .mat-form-field-label,.mat-form-field._mat-animation-noopable .mat-form-field-ripple{transition:none}\n", ".mat-form-field-appearance-fill .mat-form-field-flex{border-radius:4px 4px 0 0;padding:.75em .75em 0 .75em}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-flex{outline:solid 1px}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-focused .mat-form-field-flex{outline:dashed 3px}.mat-form-field-appearance-fill .mat-form-field-underline::before{content:\"\";display:block;position:absolute;bottom:0;height:1px;width:100%}.mat-form-field-appearance-fill .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-ripple{height:0}.mat-form-field-appearance-fill:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-fill._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}.mat-form-field-appearance-fill .mat-form-field-subscript-wrapper{padding:0 1em}\n", ".mat-input-element{font:inherit;background:transparent;color:currentColor;border:none;outline:none;padding:0;margin:0;width:100%;max-width:100%;vertical-align:bottom;text-align:inherit;box-sizing:content-box}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element,.mat-input-element::-webkit-search-cancel-button,.mat-input-element::-webkit-search-decoration,.mat-input-element::-webkit-search-results-button,.mat-input-element::-webkit-search-results-decoration{-webkit-appearance:none}.mat-input-element::-webkit-contacts-auto-fill-button,.mat-input-element::-webkit-caps-lock-indicator,.mat-input-element:not([type=password])::-webkit-credentials-auto-fill-button{visibility:hidden}.mat-input-element[type=date],.mat-input-element[type=datetime],.mat-input-element[type=datetime-local],.mat-input-element[type=month],.mat-input-element[type=week],.mat-input-element[type=time]{line-height:1}.mat-input-element[type=date]::after,.mat-input-element[type=datetime]::after,.mat-input-element[type=datetime-local]::after,.mat-input-element[type=month]::after,.mat-input-element[type=week]::after,.mat-input-element[type=time]::after{content:\" \";white-space:pre;width:1px}.mat-input-element::-webkit-inner-spin-button,.mat-input-element::-webkit-calendar-picker-indicator,.mat-input-element::-webkit-clear-button{font-size:.75em}.mat-input-element::placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-moz-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-webkit-input-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element:-ms-input-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-hide-placeholder .mat-input-element::placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{opacity:0}textarea.mat-input-element{resize:vertical;overflow:auto}textarea.mat-input-element.cdk-textarea-autosize{resize:none}textarea.mat-input-element{padding:2px 0;margin:-2px 0}select.mat-input-element{-moz-appearance:none;-webkit-appearance:none;position:relative;background-color:transparent;display:inline-flex;box-sizing:border-box;padding-top:1em;top:-1em;margin-bottom:-1em}select.mat-input-element::-moz-focus-inner{border:0}select.mat-input-element:not(:disabled){cursor:pointer}.mat-form-field-type-mat-native-select .mat-form-field-infix::after{content:\"\";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;position:absolute;top:50%;right:0;margin-top:-2.5px;pointer-events:none}[dir=rtl] .mat-form-field-type-mat-native-select .mat-form-field-infix::after{right:auto;left:0}.mat-form-field-type-mat-native-select .mat-input-element{padding-right:15px}[dir=rtl] .mat-form-field-type-mat-native-select .mat-input-element{padding-right:0;padding-left:15px}.mat-form-field-type-mat-native-select .mat-form-field-label-wrapper{max-width:calc(100% - 10px)}.mat-form-field-type-mat-native-select.mat-form-field-appearance-outline .mat-form-field-infix::after{margin-top:-5px}.mat-form-field-type-mat-native-select.mat-form-field-appearance-fill .mat-form-field-infix::after{margin-top:-10px}\n", ".mat-form-field-appearance-legacy .mat-form-field-label{transform:perspective(100px)}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon{width:1em}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button{font:inherit;vertical-align:baseline}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button .mat-icon{font-size:inherit}.mat-form-field-appearance-legacy .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-legacy .mat-form-field-ripple{top:0;height:2px;overflow:hidden}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-legacy.mat-form-field-invalid:not(.mat-focused) .mat-form-field-ripple{height:1px}\n", ".mat-form-field-appearance-outline .mat-form-field-wrapper{margin:.25em 0}.mat-form-field-appearance-outline .mat-form-field-flex{padding:0 .75em 0 .75em;margin-top:-0.25em;position:relative}.mat-form-field-appearance-outline .mat-form-field-prefix,.mat-form-field-appearance-outline .mat-form-field-suffix{top:.25em}.mat-form-field-appearance-outline .mat-form-field-outline{display:flex;position:absolute;top:.25em;left:0;right:0;bottom:0;pointer-events:none}.mat-form-field-appearance-outline .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-end{border:1px solid currentColor;min-width:5px}.mat-form-field-appearance-outline .mat-form-field-outline-start{border-radius:5px 0 0 5px;border-right-style:none}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-start{border-right-style:solid;border-left-style:none;border-radius:0 5px 5px 0}.mat-form-field-appearance-outline .mat-form-field-outline-end{border-radius:0 5px 5px 0;border-left-style:none;flex-grow:1}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-end{border-left-style:solid;border-right-style:none;border-radius:5px 0 0 5px}.mat-form-field-appearance-outline .mat-form-field-outline-gap{border-radius:.000001px;border:1px solid currentColor;border-left-style:none;border-right-style:none}.mat-form-field-appearance-outline.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-outline-gap{border-top-color:transparent}.mat-form-field-appearance-outline .mat-form-field-outline-thick{opacity:0}.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-end,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-gap{border-width:2px}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline{opacity:0;transition:opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline-thick{opacity:1}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick{border:3px dashed}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline{opacity:0;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline-thick{opacity:1}.mat-form-field-appearance-outline .mat-form-field-subscript-wrapper{padding:0 1em}.mat-form-field-appearance-outline._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-start,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-end,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-gap{transition:none}\n", ".mat-form-field-appearance-standard .mat-form-field-flex{padding-top:.75em}.mat-form-field-appearance-standard .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-standard .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-standard:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-standard._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}\n"],
+  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.NgIf, _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_14__.CdkObserveContent, _angular_common__WEBPACK_IMPORTED_MODULE_13__.NgSwitch, _angular_common__WEBPACK_IMPORTED_MODULE_13__.NgSwitchCase],
+  styles: [".mat-form-field{display:inline-block;position:relative;text-align:left}[dir=rtl] .mat-form-field{text-align:right}.mat-form-field-wrapper{position:relative}.mat-form-field-flex{display:inline-flex;align-items:baseline;box-sizing:border-box;width:100%}.mat-form-field-prefix,.mat-form-field-suffix{white-space:nowrap;flex:none;position:relative}.mat-form-field-infix{display:block;position:relative;flex:auto;min-width:0;width:180px}.cdk-high-contrast-active .mat-form-field-infix{border-image:linear-gradient(transparent, transparent)}.mat-form-field-label-wrapper{position:absolute;left:0;box-sizing:content-box;width:100%;height:100%;overflow:hidden;pointer-events:none}[dir=rtl] .mat-form-field-label-wrapper{left:auto;right:0}.mat-form-field-label{position:absolute;left:0;font:inherit;pointer-events:none;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform-origin:0 0;transition:transform 400ms cubic-bezier(0.25, 0.8, 0.25, 1),color 400ms cubic-bezier(0.25, 0.8, 0.25, 1),width 400ms cubic-bezier(0.25, 0.8, 0.25, 1);display:none}[dir=rtl] .mat-form-field-label{transform-origin:100% 0;left:auto;right:0}.cdk-high-contrast-active .mat-form-field-disabled .mat-form-field-label{color:GrayText}.mat-form-field-empty.mat-form-field-label,.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-label{display:block}.mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:block;transition:none}.mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-form-field-can-float .mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:block}.mat-form-field-label:not(.mat-form-field-empty){transition:none}.mat-form-field-underline{position:absolute;width:100%;pointer-events:none;transform:scale3d(1, 1.0001, 1)}.mat-form-field-ripple{position:absolute;left:0;width:100%;transform-origin:50%;transform:scaleX(0.5);opacity:0;transition:background-color 300ms cubic-bezier(0.55, 0, 0.55, 0.2)}.mat-form-field.mat-focused .mat-form-field-ripple,.mat-form-field.mat-form-field-invalid .mat-form-field-ripple{opacity:1;transform:none;transition:transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1),opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1),background-color 300ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-subscript-wrapper{position:absolute;box-sizing:border-box;width:100%;overflow:hidden}.mat-form-field-subscript-wrapper .mat-icon,.mat-form-field-label-wrapper .mat-icon{width:1em;height:1em;font-size:inherit;vertical-align:baseline}.mat-form-field-hint-wrapper{display:flex}.mat-form-field-hint-spacer{flex:1 0 1em}.mat-error{display:block}.mat-form-field-control-wrapper{position:relative}.mat-form-field-hint-end{order:1}.mat-form-field._mat-animation-noopable .mat-form-field-label,.mat-form-field._mat-animation-noopable .mat-form-field-ripple{transition:none}\n", ".mat-form-field-appearance-fill .mat-form-field-flex{border-radius:4px 4px 0 0;padding:.75em .75em 0 .75em}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-flex{outline:solid 1px}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-form-field-disabled .mat-form-field-flex{outline-color:GrayText}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-focused .mat-form-field-flex{outline:dashed 3px}.mat-form-field-appearance-fill .mat-form-field-underline::before{content:\"\";display:block;position:absolute;bottom:0;height:1px;width:100%}.mat-form-field-appearance-fill .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-ripple{height:0}.mat-form-field-appearance-fill:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-fill._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}.mat-form-field-appearance-fill .mat-form-field-subscript-wrapper{padding:0 1em}\n", ".mat-input-element{font:inherit;background:transparent;color:currentColor;border:none;outline:none;padding:0;margin:0;width:100%;max-width:100%;vertical-align:bottom;text-align:inherit;box-sizing:content-box}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element,.mat-input-element::-webkit-search-cancel-button,.mat-input-element::-webkit-search-decoration,.mat-input-element::-webkit-search-results-button,.mat-input-element::-webkit-search-results-decoration{-webkit-appearance:none}.mat-input-element::-webkit-contacts-auto-fill-button,.mat-input-element::-webkit-caps-lock-indicator,.mat-input-element:not([type=password])::-webkit-credentials-auto-fill-button{visibility:hidden}.mat-input-element[type=date],.mat-input-element[type=datetime],.mat-input-element[type=datetime-local],.mat-input-element[type=month],.mat-input-element[type=week],.mat-input-element[type=time]{line-height:1}.mat-input-element[type=date]::after,.mat-input-element[type=datetime]::after,.mat-input-element[type=datetime-local]::after,.mat-input-element[type=month]::after,.mat-input-element[type=week]::after,.mat-input-element[type=time]::after{content:\" \";white-space:pre;width:1px}.mat-input-element::-webkit-inner-spin-button,.mat-input-element::-webkit-calendar-picker-indicator,.mat-input-element::-webkit-clear-button{font-size:.75em}.mat-input-element::placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-moz-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-webkit-input-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element:-ms-input-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-hide-placeholder .mat-input-element::placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{opacity:0}textarea.mat-input-element{resize:vertical;overflow:auto}textarea.mat-input-element.cdk-textarea-autosize{resize:none}textarea.mat-input-element{padding:2px 0;margin:-2px 0}select.mat-input-element{-moz-appearance:none;-webkit-appearance:none;position:relative;background-color:transparent;display:inline-flex;box-sizing:border-box;padding-top:1em;top:-1em;margin-bottom:-1em}select.mat-input-element::-moz-focus-inner{border:0}select.mat-input-element:not(:disabled){cursor:pointer}.mat-form-field-type-mat-native-select .mat-form-field-infix::after{content:\"\";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;position:absolute;top:50%;right:0;margin-top:-2.5px;pointer-events:none}[dir=rtl] .mat-form-field-type-mat-native-select .mat-form-field-infix::after{right:auto;left:0}.mat-form-field-type-mat-native-select .mat-input-element{padding-right:15px}[dir=rtl] .mat-form-field-type-mat-native-select .mat-input-element{padding-right:0;padding-left:15px}.mat-form-field-type-mat-native-select .mat-form-field-label-wrapper{max-width:calc(100% - 10px)}.mat-form-field-type-mat-native-select.mat-form-field-appearance-outline .mat-form-field-infix::after{margin-top:-5px}.mat-form-field-type-mat-native-select.mat-form-field-appearance-fill .mat-form-field-infix::after{margin-top:-10px}\n", ".mat-form-field-appearance-legacy .mat-form-field-label{transform:perspective(100px)}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon{width:1em}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button{font:inherit;vertical-align:baseline}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button .mat-icon{font-size:inherit}.mat-form-field-appearance-legacy .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-legacy .mat-form-field-ripple{top:0;height:2px;overflow:hidden}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px;border-top-color:GrayText}.mat-form-field-appearance-legacy.mat-form-field-invalid:not(.mat-focused) .mat-form-field-ripple{height:1px}\n", ".mat-form-field-appearance-outline .mat-form-field-wrapper{margin:.25em 0}.mat-form-field-appearance-outline .mat-form-field-flex{padding:0 .75em 0 .75em;margin-top:-0.25em;position:relative}.mat-form-field-appearance-outline .mat-form-field-prefix,.mat-form-field-appearance-outline .mat-form-field-suffix{top:.25em}.mat-form-field-appearance-outline .mat-form-field-outline{display:flex;position:absolute;top:.25em;left:0;right:0;bottom:0;pointer-events:none}.mat-form-field-appearance-outline .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-end{border:1px solid currentColor;min-width:5px}.mat-form-field-appearance-outline .mat-form-field-outline-start{border-radius:5px 0 0 5px;border-right-style:none}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-start{border-right-style:solid;border-left-style:none;border-radius:0 5px 5px 0}.mat-form-field-appearance-outline .mat-form-field-outline-end{border-radius:0 5px 5px 0;border-left-style:none;flex-grow:1}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-end{border-left-style:solid;border-right-style:none;border-radius:5px 0 0 5px}.mat-form-field-appearance-outline .mat-form-field-outline-gap{border-radius:.000001px;border:1px solid currentColor;border-left-style:none;border-right-style:none}.mat-form-field-appearance-outline.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-outline-gap{border-top-color:transparent}.mat-form-field-appearance-outline .mat-form-field-outline-thick{opacity:0}.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-end,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-gap{border-width:2px}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline{opacity:0;transition:opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline-thick{opacity:1}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick{border:3px dashed}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline{opacity:0;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline-thick{opacity:1}.mat-form-field-appearance-outline .mat-form-field-subscript-wrapper{padding:0 1em}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-form-field-disabled .mat-form-field-outline{color:GrayText}.mat-form-field-appearance-outline._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-start,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-end,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-gap{transition:none}\n", ".mat-form-field-appearance-standard .mat-form-field-flex{padding-top:.75em}.mat-form-field-appearance-standard .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-standard .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-standard:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-standard._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}\n"],
   encapsulation: 2,
   data: {
     animation: [matFormFieldAnimations.transitionMessages]
@@ -90749,7 +91279,7 @@ MatFormField.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["
         useExisting: MatFormField
       }],
       template: "<div class=\"mat-form-field-wrapper\">\n  <div class=\"mat-form-field-flex\" #connectionContainer\n       (click)=\"_control.onContainerClick && _control.onContainerClick($event)\">\n\n    <!-- Outline used for outline appearance. -->\n    <ng-container *ngIf=\"appearance == 'outline'\">\n      <div class=\"mat-form-field-outline\">\n        <div class=\"mat-form-field-outline-start\"></div>\n        <div class=\"mat-form-field-outline-gap\"></div>\n        <div class=\"mat-form-field-outline-end\"></div>\n      </div>\n      <div class=\"mat-form-field-outline mat-form-field-outline-thick\">\n        <div class=\"mat-form-field-outline-start\"></div>\n        <div class=\"mat-form-field-outline-gap\"></div>\n        <div class=\"mat-form-field-outline-end\"></div>\n      </div>\n    </ng-container>\n\n    <div\n      class=\"mat-form-field-prefix\"\n      *ngIf=\"_prefixChildren.length\"\n      (cdkObserveContent)=\"updateOutlineGap()\"\n      [cdkObserveContentDisabled]=\"appearance != 'outline'\">\n      <ng-content select=\"[matPrefix]\"></ng-content>\n    </div>\n\n    <div class=\"mat-form-field-infix\" #inputContainer>\n      <ng-content></ng-content>\n\n      <span class=\"mat-form-field-label-wrapper\">\n        <!-- We add aria-owns as a workaround for an issue in JAWS & NVDA where the label isn't\n             read if it comes before the control in the DOM. -->\n        <label class=\"mat-form-field-label\"\n               (cdkObserveContent)=\"updateOutlineGap()\"\n               [cdkObserveContentDisabled]=\"appearance != 'outline'\"\n               [id]=\"_labelId\"\n               [attr.for]=\"_control.id\"\n               [attr.aria-owns]=\"_control.id\"\n               [class.mat-empty]=\"_control.empty && !_shouldAlwaysFloat()\"\n               [class.mat-form-field-empty]=\"_control.empty && !_shouldAlwaysFloat()\"\n               [class.mat-accent]=\"color == 'accent'\"\n               [class.mat-warn]=\"color == 'warn'\"\n               #label\n               *ngIf=\"_hasFloatingLabel()\"\n               [ngSwitch]=\"_hasLabel()\">\n\n          <!-- @breaking-change 8.0.0 remove in favor of mat-label element an placeholder attr. -->\n          <ng-container *ngSwitchCase=\"false\">\n            <ng-content select=\"mat-placeholder\"></ng-content>\n            <span>{{_control.placeholder}}</span>\n          </ng-container>\n\n          <ng-content select=\"mat-label\" *ngSwitchCase=\"true\"></ng-content>\n\n          <!-- @breaking-change 8.0.0 remove `mat-placeholder-required` class -->\n          <span\n            class=\"mat-placeholder-required mat-form-field-required-marker\"\n            aria-hidden=\"true\"\n            *ngIf=\"!hideRequiredMarker && _control.required && !_control.disabled\">&#32;*</span>\n        </label>\n      </span>\n    </div>\n\n    <div class=\"mat-form-field-suffix\" *ngIf=\"_suffixChildren.length\">\n      <ng-content select=\"[matSuffix]\"></ng-content>\n    </div>\n  </div>\n\n  <!-- Underline used for legacy, standard, and box appearances. -->\n  <div class=\"mat-form-field-underline\"\n       *ngIf=\"appearance != 'outline'\">\n    <span class=\"mat-form-field-ripple\"\n          [class.mat-accent]=\"color == 'accent'\"\n          [class.mat-warn]=\"color == 'warn'\"></span>\n  </div>\n\n  <div class=\"mat-form-field-subscript-wrapper\"\n       [ngSwitch]=\"_getDisplayedMessages()\">\n    <div *ngSwitchCase=\"'error'\" [@transitionMessages]=\"_subscriptAnimationState\">\n      <ng-content select=\"mat-error\"></ng-content>\n    </div>\n\n    <div class=\"mat-form-field-hint-wrapper\" *ngSwitchCase=\"'hint'\"\n      [@transitionMessages]=\"_subscriptAnimationState\">\n      <!-- TODO(mmalerba): use an actual <mat-hint> once all selectors are switched to mat-* -->\n      <div *ngIf=\"hintLabel\" [id]=\"_hintLabelId\" class=\"mat-hint\">{{hintLabel}}</div>\n      <ng-content select=\"mat-hint:not([align='end'])\"></ng-content>\n      <div class=\"mat-form-field-hint-spacer\"></div>\n      <ng-content select=\"mat-hint[align='end']\"></ng-content>\n    </div>\n  </div>\n</div>\n",
-      styles: [".mat-form-field{display:inline-block;position:relative;text-align:left}[dir=rtl] .mat-form-field{text-align:right}.mat-form-field-wrapper{position:relative}.mat-form-field-flex{display:inline-flex;align-items:baseline;box-sizing:border-box;width:100%}.mat-form-field-prefix,.mat-form-field-suffix{white-space:nowrap;flex:none;position:relative}.mat-form-field-infix{display:block;position:relative;flex:auto;min-width:0;width:180px}.cdk-high-contrast-active .mat-form-field-infix{border-image:linear-gradient(transparent, transparent)}.mat-form-field-label-wrapper{position:absolute;left:0;box-sizing:content-box;width:100%;height:100%;overflow:hidden;pointer-events:none}[dir=rtl] .mat-form-field-label-wrapper{left:auto;right:0}.mat-form-field-label{position:absolute;left:0;font:inherit;pointer-events:none;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform-origin:0 0;transition:transform 400ms cubic-bezier(0.25, 0.8, 0.25, 1),color 400ms cubic-bezier(0.25, 0.8, 0.25, 1),width 400ms cubic-bezier(0.25, 0.8, 0.25, 1);display:none}[dir=rtl] .mat-form-field-label{transform-origin:100% 0;left:auto;right:0}.mat-form-field-empty.mat-form-field-label,.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-label{display:block}.mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:block;transition:none}.mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-form-field-can-float .mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:block}.mat-form-field-label:not(.mat-form-field-empty){transition:none}.mat-form-field-underline{position:absolute;width:100%;pointer-events:none;transform:scale3d(1, 1.0001, 1)}.mat-form-field-ripple{position:absolute;left:0;width:100%;transform-origin:50%;transform:scaleX(0.5);opacity:0;transition:background-color 300ms cubic-bezier(0.55, 0, 0.55, 0.2)}.mat-form-field.mat-focused .mat-form-field-ripple,.mat-form-field.mat-form-field-invalid .mat-form-field-ripple{opacity:1;transform:none;transition:transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1),opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1),background-color 300ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-subscript-wrapper{position:absolute;box-sizing:border-box;width:100%;overflow:hidden}.mat-form-field-subscript-wrapper .mat-icon,.mat-form-field-label-wrapper .mat-icon{width:1em;height:1em;font-size:inherit;vertical-align:baseline}.mat-form-field-hint-wrapper{display:flex}.mat-form-field-hint-spacer{flex:1 0 1em}.mat-error{display:block}.mat-form-field-control-wrapper{position:relative}.mat-form-field-hint-end{order:1}.mat-form-field._mat-animation-noopable .mat-form-field-label,.mat-form-field._mat-animation-noopable .mat-form-field-ripple{transition:none}\n", ".mat-form-field-appearance-fill .mat-form-field-flex{border-radius:4px 4px 0 0;padding:.75em .75em 0 .75em}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-flex{outline:solid 1px}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-focused .mat-form-field-flex{outline:dashed 3px}.mat-form-field-appearance-fill .mat-form-field-underline::before{content:\"\";display:block;position:absolute;bottom:0;height:1px;width:100%}.mat-form-field-appearance-fill .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-ripple{height:0}.mat-form-field-appearance-fill:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-fill._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}.mat-form-field-appearance-fill .mat-form-field-subscript-wrapper{padding:0 1em}\n", ".mat-input-element{font:inherit;background:transparent;color:currentColor;border:none;outline:none;padding:0;margin:0;width:100%;max-width:100%;vertical-align:bottom;text-align:inherit;box-sizing:content-box}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element,.mat-input-element::-webkit-search-cancel-button,.mat-input-element::-webkit-search-decoration,.mat-input-element::-webkit-search-results-button,.mat-input-element::-webkit-search-results-decoration{-webkit-appearance:none}.mat-input-element::-webkit-contacts-auto-fill-button,.mat-input-element::-webkit-caps-lock-indicator,.mat-input-element:not([type=password])::-webkit-credentials-auto-fill-button{visibility:hidden}.mat-input-element[type=date],.mat-input-element[type=datetime],.mat-input-element[type=datetime-local],.mat-input-element[type=month],.mat-input-element[type=week],.mat-input-element[type=time]{line-height:1}.mat-input-element[type=date]::after,.mat-input-element[type=datetime]::after,.mat-input-element[type=datetime-local]::after,.mat-input-element[type=month]::after,.mat-input-element[type=week]::after,.mat-input-element[type=time]::after{content:\" \";white-space:pre;width:1px}.mat-input-element::-webkit-inner-spin-button,.mat-input-element::-webkit-calendar-picker-indicator,.mat-input-element::-webkit-clear-button{font-size:.75em}.mat-input-element::placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-moz-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-webkit-input-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element:-ms-input-placeholder{-webkit-user-select:none;-moz-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-hide-placeholder .mat-input-element::placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{opacity:0}textarea.mat-input-element{resize:vertical;overflow:auto}textarea.mat-input-element.cdk-textarea-autosize{resize:none}textarea.mat-input-element{padding:2px 0;margin:-2px 0}select.mat-input-element{-moz-appearance:none;-webkit-appearance:none;position:relative;background-color:transparent;display:inline-flex;box-sizing:border-box;padding-top:1em;top:-1em;margin-bottom:-1em}select.mat-input-element::-moz-focus-inner{border:0}select.mat-input-element:not(:disabled){cursor:pointer}.mat-form-field-type-mat-native-select .mat-form-field-infix::after{content:\"\";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;position:absolute;top:50%;right:0;margin-top:-2.5px;pointer-events:none}[dir=rtl] .mat-form-field-type-mat-native-select .mat-form-field-infix::after{right:auto;left:0}.mat-form-field-type-mat-native-select .mat-input-element{padding-right:15px}[dir=rtl] .mat-form-field-type-mat-native-select .mat-input-element{padding-right:0;padding-left:15px}.mat-form-field-type-mat-native-select .mat-form-field-label-wrapper{max-width:calc(100% - 10px)}.mat-form-field-type-mat-native-select.mat-form-field-appearance-outline .mat-form-field-infix::after{margin-top:-5px}.mat-form-field-type-mat-native-select.mat-form-field-appearance-fill .mat-form-field-infix::after{margin-top:-10px}\n", ".mat-form-field-appearance-legacy .mat-form-field-label{transform:perspective(100px)}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon{width:1em}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button{font:inherit;vertical-align:baseline}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button .mat-icon{font-size:inherit}.mat-form-field-appearance-legacy .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-legacy .mat-form-field-ripple{top:0;height:2px;overflow:hidden}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-legacy.mat-form-field-invalid:not(.mat-focused) .mat-form-field-ripple{height:1px}\n", ".mat-form-field-appearance-outline .mat-form-field-wrapper{margin:.25em 0}.mat-form-field-appearance-outline .mat-form-field-flex{padding:0 .75em 0 .75em;margin-top:-0.25em;position:relative}.mat-form-field-appearance-outline .mat-form-field-prefix,.mat-form-field-appearance-outline .mat-form-field-suffix{top:.25em}.mat-form-field-appearance-outline .mat-form-field-outline{display:flex;position:absolute;top:.25em;left:0;right:0;bottom:0;pointer-events:none}.mat-form-field-appearance-outline .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-end{border:1px solid currentColor;min-width:5px}.mat-form-field-appearance-outline .mat-form-field-outline-start{border-radius:5px 0 0 5px;border-right-style:none}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-start{border-right-style:solid;border-left-style:none;border-radius:0 5px 5px 0}.mat-form-field-appearance-outline .mat-form-field-outline-end{border-radius:0 5px 5px 0;border-left-style:none;flex-grow:1}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-end{border-left-style:solid;border-right-style:none;border-radius:5px 0 0 5px}.mat-form-field-appearance-outline .mat-form-field-outline-gap{border-radius:.000001px;border:1px solid currentColor;border-left-style:none;border-right-style:none}.mat-form-field-appearance-outline.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-outline-gap{border-top-color:transparent}.mat-form-field-appearance-outline .mat-form-field-outline-thick{opacity:0}.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-end,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-gap{border-width:2px}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline{opacity:0;transition:opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline-thick{opacity:1}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick{border:3px dashed}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline{opacity:0;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline-thick{opacity:1}.mat-form-field-appearance-outline .mat-form-field-subscript-wrapper{padding:0 1em}.mat-form-field-appearance-outline._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-start,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-end,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-gap{transition:none}\n", ".mat-form-field-appearance-standard .mat-form-field-flex{padding-top:.75em}.mat-form-field-appearance-standard .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-standard .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-standard:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-standard._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}\n"]
+      styles: [".mat-form-field{display:inline-block;position:relative;text-align:left}[dir=rtl] .mat-form-field{text-align:right}.mat-form-field-wrapper{position:relative}.mat-form-field-flex{display:inline-flex;align-items:baseline;box-sizing:border-box;width:100%}.mat-form-field-prefix,.mat-form-field-suffix{white-space:nowrap;flex:none;position:relative}.mat-form-field-infix{display:block;position:relative;flex:auto;min-width:0;width:180px}.cdk-high-contrast-active .mat-form-field-infix{border-image:linear-gradient(transparent, transparent)}.mat-form-field-label-wrapper{position:absolute;left:0;box-sizing:content-box;width:100%;height:100%;overflow:hidden;pointer-events:none}[dir=rtl] .mat-form-field-label-wrapper{left:auto;right:0}.mat-form-field-label{position:absolute;left:0;font:inherit;pointer-events:none;width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;transform-origin:0 0;transition:transform 400ms cubic-bezier(0.25, 0.8, 0.25, 1),color 400ms cubic-bezier(0.25, 0.8, 0.25, 1),width 400ms cubic-bezier(0.25, 0.8, 0.25, 1);display:none}[dir=rtl] .mat-form-field-label{transform-origin:100% 0;left:auto;right:0}.cdk-high-contrast-active .mat-form-field-disabled .mat-form-field-label{color:GrayText}.mat-form-field-empty.mat-form-field-label,.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-label{display:block}.mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-form-field-autofill-control:-webkit-autofill+.mat-form-field-label-wrapper .mat-form-field-label{display:block;transition:none}.mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:none}.mat-form-field-can-float .mat-input-server:focus+.mat-form-field-label-wrapper .mat-form-field-label,.mat-form-field-can-float .mat-input-server[placeholder]:not(:placeholder-shown)+.mat-form-field-label-wrapper .mat-form-field-label{display:block}.mat-form-field-label:not(.mat-form-field-empty){transition:none}.mat-form-field-underline{position:absolute;width:100%;pointer-events:none;transform:scale3d(1, 1.0001, 1)}.mat-form-field-ripple{position:absolute;left:0;width:100%;transform-origin:50%;transform:scaleX(0.5);opacity:0;transition:background-color 300ms cubic-bezier(0.55, 0, 0.55, 0.2)}.mat-form-field.mat-focused .mat-form-field-ripple,.mat-form-field.mat-form-field-invalid .mat-form-field-ripple{opacity:1;transform:none;transition:transform 300ms cubic-bezier(0.25, 0.8, 0.25, 1),opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1),background-color 300ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-subscript-wrapper{position:absolute;box-sizing:border-box;width:100%;overflow:hidden}.mat-form-field-subscript-wrapper .mat-icon,.mat-form-field-label-wrapper .mat-icon{width:1em;height:1em;font-size:inherit;vertical-align:baseline}.mat-form-field-hint-wrapper{display:flex}.mat-form-field-hint-spacer{flex:1 0 1em}.mat-error{display:block}.mat-form-field-control-wrapper{position:relative}.mat-form-field-hint-end{order:1}.mat-form-field._mat-animation-noopable .mat-form-field-label,.mat-form-field._mat-animation-noopable .mat-form-field-ripple{transition:none}\n", ".mat-form-field-appearance-fill .mat-form-field-flex{border-radius:4px 4px 0 0;padding:.75em .75em 0 .75em}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-flex{outline:solid 1px}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-form-field-disabled .mat-form-field-flex{outline-color:GrayText}.cdk-high-contrast-active .mat-form-field-appearance-fill.mat-focused .mat-form-field-flex{outline:dashed 3px}.mat-form-field-appearance-fill .mat-form-field-underline::before{content:\"\";display:block;position:absolute;bottom:0;height:1px;width:100%}.mat-form-field-appearance-fill .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-fill .mat-form-field-ripple{height:0}.mat-form-field-appearance-fill:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-fill._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}.mat-form-field-appearance-fill .mat-form-field-subscript-wrapper{padding:0 1em}\n", ".mat-input-element{font:inherit;background:transparent;color:currentColor;border:none;outline:none;padding:0;margin:0;width:100%;max-width:100%;vertical-align:bottom;text-align:inherit;box-sizing:content-box}.mat-input-element:-moz-ui-invalid{box-shadow:none}.mat-input-element,.mat-input-element::-webkit-search-cancel-button,.mat-input-element::-webkit-search-decoration,.mat-input-element::-webkit-search-results-button,.mat-input-element::-webkit-search-results-decoration{-webkit-appearance:none}.mat-input-element::-webkit-contacts-auto-fill-button,.mat-input-element::-webkit-caps-lock-indicator,.mat-input-element:not([type=password])::-webkit-credentials-auto-fill-button{visibility:hidden}.mat-input-element[type=date],.mat-input-element[type=datetime],.mat-input-element[type=datetime-local],.mat-input-element[type=month],.mat-input-element[type=week],.mat-input-element[type=time]{line-height:1}.mat-input-element[type=date]::after,.mat-input-element[type=datetime]::after,.mat-input-element[type=datetime-local]::after,.mat-input-element[type=month]::after,.mat-input-element[type=week]::after,.mat-input-element[type=time]::after{content:\" \";white-space:pre;width:1px}.mat-input-element::-webkit-inner-spin-button,.mat-input-element::-webkit-calendar-picker-indicator,.mat-input-element::-webkit-clear-button{font-size:.75em}.mat-input-element::placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-moz-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element::-webkit-input-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-input-element:-ms-input-placeholder{-webkit-user-select:none;user-select:none;transition:color 400ms 133.3333333333ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-hide-placeholder .mat-input-element::placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-moz-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element::-webkit-input-placeholder{opacity:0}.mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{color:transparent !important;-webkit-text-fill-color:transparent;transition:none}.cdk-high-contrast-active .mat-form-field-hide-placeholder .mat-input-element:-ms-input-placeholder{opacity:0}textarea.mat-input-element{resize:vertical;overflow:auto}textarea.mat-input-element.cdk-textarea-autosize{resize:none}textarea.mat-input-element{padding:2px 0;margin:-2px 0}select.mat-input-element{-moz-appearance:none;-webkit-appearance:none;position:relative;background-color:transparent;display:inline-flex;box-sizing:border-box;padding-top:1em;top:-1em;margin-bottom:-1em}select.mat-input-element::-moz-focus-inner{border:0}select.mat-input-element:not(:disabled){cursor:pointer}.mat-form-field-type-mat-native-select .mat-form-field-infix::after{content:\"\";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid;position:absolute;top:50%;right:0;margin-top:-2.5px;pointer-events:none}[dir=rtl] .mat-form-field-type-mat-native-select .mat-form-field-infix::after{right:auto;left:0}.mat-form-field-type-mat-native-select .mat-input-element{padding-right:15px}[dir=rtl] .mat-form-field-type-mat-native-select .mat-input-element{padding-right:0;padding-left:15px}.mat-form-field-type-mat-native-select .mat-form-field-label-wrapper{max-width:calc(100% - 10px)}.mat-form-field-type-mat-native-select.mat-form-field-appearance-outline .mat-form-field-infix::after{margin-top:-5px}.mat-form-field-type-mat-native-select.mat-form-field-appearance-fill .mat-form-field-infix::after{margin-top:-10px}\n", ".mat-form-field-appearance-legacy .mat-form-field-label{transform:perspective(100px)}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon{width:1em}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button{font:inherit;vertical-align:baseline}.mat-form-field-appearance-legacy .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field-appearance-legacy .mat-form-field-suffix .mat-icon-button .mat-icon{font-size:inherit}.mat-form-field-appearance-legacy .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-legacy .mat-form-field-ripple{top:0;height:2px;overflow:hidden}.cdk-high-contrast-active .mat-form-field-appearance-legacy .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-legacy.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px;border-top-color:GrayText}.mat-form-field-appearance-legacy.mat-form-field-invalid:not(.mat-focused) .mat-form-field-ripple{height:1px}\n", ".mat-form-field-appearance-outline .mat-form-field-wrapper{margin:.25em 0}.mat-form-field-appearance-outline .mat-form-field-flex{padding:0 .75em 0 .75em;margin-top:-0.25em;position:relative}.mat-form-field-appearance-outline .mat-form-field-prefix,.mat-form-field-appearance-outline .mat-form-field-suffix{top:.25em}.mat-form-field-appearance-outline .mat-form-field-outline{display:flex;position:absolute;top:.25em;left:0;right:0;bottom:0;pointer-events:none}.mat-form-field-appearance-outline .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-end{border:1px solid currentColor;min-width:5px}.mat-form-field-appearance-outline .mat-form-field-outline-start{border-radius:5px 0 0 5px;border-right-style:none}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-start{border-right-style:solid;border-left-style:none;border-radius:0 5px 5px 0}.mat-form-field-appearance-outline .mat-form-field-outline-end{border-radius:0 5px 5px 0;border-left-style:none;flex-grow:1}[dir=rtl] .mat-form-field-appearance-outline .mat-form-field-outline-end{border-left-style:solid;border-right-style:none;border-radius:5px 0 0 5px}.mat-form-field-appearance-outline .mat-form-field-outline-gap{border-radius:.000001px;border:1px solid currentColor;border-left-style:none;border-right-style:none}.mat-form-field-appearance-outline.mat-form-field-can-float.mat-form-field-should-float .mat-form-field-outline-gap{border-top-color:transparent}.mat-form-field-appearance-outline .mat-form-field-outline-thick{opacity:0}.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-start,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-end,.mat-form-field-appearance-outline .mat-form-field-outline-thick .mat-form-field-outline-gap{border-width:2px}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline{opacity:0;transition:opacity 100ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick,.mat-form-field-appearance-outline.mat-form-field-invalid .mat-form-field-outline-thick{opacity:1}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-focused .mat-form-field-outline-thick{border:3px dashed}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline{opacity:0;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-outline:not(.mat-form-field-disabled) .mat-form-field-flex:hover .mat-form-field-outline-thick{opacity:1}.mat-form-field-appearance-outline .mat-form-field-subscript-wrapper{padding:0 1em}.cdk-high-contrast-active .mat-form-field-appearance-outline.mat-form-field-disabled .mat-form-field-outline{color:GrayText}.mat-form-field-appearance-outline._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-start,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-end,.mat-form-field-appearance-outline._mat-animation-noopable .mat-form-field-outline-gap{transition:none}\n", ".mat-form-field-appearance-standard .mat-form-field-flex{padding-top:.75em}.mat-form-field-appearance-standard .mat-form-field-underline{height:1px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-underline{height:0;border-top:solid 1px}.mat-form-field-appearance-standard .mat-form-field-ripple{bottom:0;height:2px}.cdk-high-contrast-active .mat-form-field-appearance-standard .mat-form-field-ripple{height:0;border-top:solid 2px}.mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{background-position:0;background-color:transparent}.cdk-high-contrast-active .mat-form-field-appearance-standard.mat-form-field-disabled .mat-form-field-underline{border-top-style:dotted;border-top-width:2px}.mat-form-field-appearance-standard:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{opacity:1;transform:none;transition:opacity 600ms cubic-bezier(0.25, 0.8, 0.25, 1)}.mat-form-field-appearance-standard._mat-animation-noopable:not(.mat-form-field-disabled) .mat-form-field-flex:hover~.mat-form-field-underline .mat-form-field-ripple{transition:none}\n"]
     }]
   }], function () {
     return [{
@@ -93077,16 +93607,7 @@ class MatIcon extends _MatIconBase {
   }
 
   _setSvgElement(svg) {
-    this._clearSvgElement(); // Workaround for IE11 and Edge ignoring `style` tags inside dynamically-created SVGs.
-    // See: https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/10898469/
-    // Do this before inserting the element into the DOM, in order to avoid a style recalculation.
-
-
-    const styleTags = svg.querySelectorAll('style');
-
-    for (let i = 0; i < styleTags.length; i++) {
-      styleTags[i].textContent += ' ';
-    } // Note: we do this fix here, rather than the icon registry, because the
+    this._clearSvgElement(); // Note: we do this fix here, rather than the icon registry, because the
     // references have to point to the URL at the time that the icon was created.
 
 
@@ -93276,7 +93797,7 @@ MatIcon.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵd
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵprojection"](0);
     }
   },
-  styles: [".mat-icon{-webkit-user-select:none;-moz-user-select:none;user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px}.mat-icon.mat-icon-inline{font-size:inherit;height:inherit;line-height:inherit;width:inherit}[dir=rtl] .mat-icon-rtl-mirror{transform:scale(-1, 1)}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon{display:block}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button .mat-icon{margin:auto}\n"],
+  styles: [".mat-icon{-webkit-user-select:none;user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px}.mat-icon.mat-icon-inline{font-size:inherit;height:inherit;line-height:inherit;width:inherit}[dir=rtl] .mat-icon-rtl-mirror{transform:scale(-1, 1)}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon{display:block}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button .mat-icon{margin:auto}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -93300,7 +93821,7 @@ MatIcon.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵd
       },
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewEncapsulation.None,
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectionStrategy.OnPush,
-      styles: [".mat-icon{-webkit-user-select:none;-moz-user-select:none;user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px}.mat-icon.mat-icon-inline{font-size:inherit;height:inherit;line-height:inherit;width:inherit}[dir=rtl] .mat-icon-rtl-mirror{transform:scale(-1, 1)}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon{display:block}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button .mat-icon{margin:auto}\n"]
+      styles: [".mat-icon{-webkit-user-select:none;user-select:none;background-repeat:no-repeat;display:inline-block;fill:currentColor;height:24px;width:24px}.mat-icon.mat-icon-inline{font-size:inherit;height:inherit;line-height:inherit;width:inherit}[dir=rtl] .mat-icon-rtl-mirror{transform:scale(-1, 1)}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon{display:block}.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-prefix .mat-icon-button .mat-icon,.mat-form-field:not(.mat-form-field-appearance-legacy) .mat-form-field-suffix .mat-icon-button .mat-icon{margin:auto}\n"]
     }]
   }], function () {
     return [{
@@ -93525,6 +94046,25 @@ class MatInput extends _MatInputBase {
     this._type = 'text';
     this._readonly = false;
     this._neverEmptyInputTypes = ['date', 'datetime', 'datetime-local', 'month', 'time', 'week'].filter(t => (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__.getSupportedInputTypes)().has(t));
+
+    this._iOSKeyupListener = event => {
+      const el = event.target; // Note: We specifically check for 0, rather than `!el.selectionStart`, because the two
+      // indicate different things. If the value is 0, it means that the caret is at the start
+      // of the input, whereas a value of `null` means that the input doesn't support
+      // manipulating the selection range. Inputs that don't support setting the selection range
+      // will throw an error so we want to avoid calling `setSelectionRange` on them. See:
+      // https://html.spec.whatwg.org/multipage/input.html#do-not-apply
+
+      if (!el.value && el.selectionStart === 0 && el.selectionEnd === 0) {
+        // Note: Just setting `0, 0` doesn't fix the issue. Setting
+        // `1, 1` fixes it for the first time that you type text and
+        // then hold delete. Toggling to `1, 1` and then back to
+        // `0, 0` seems to completely fix it.
+        el.setSelectionRange(1, 1);
+        el.setSelectionRange(0, 0);
+      }
+    };
+
     const element = this._elementRef.nativeElement;
     const nodeName = element.nodeName.toLowerCase(); // If no input value accessor was explicitly specified, use the element as the input value
     // accessor.
@@ -93538,23 +94078,7 @@ class MatInput extends _MatInputBase {
 
     if (_platform.IOS) {
       ngZone.runOutsideAngular(() => {
-        _elementRef.nativeElement.addEventListener('keyup', event => {
-          const el = event.target; // Note: We specifically check for 0, rather than `!el.selectionStart`, because the two
-          // indicate different things. If the value is 0, it means that the caret is at the start
-          // of the input, whereas a value of `null` means that the input doesn't support
-          // manipulating the selection range. Inputs that don't support setting the selection range
-          // will throw an error so we want to avoid calling `setSelectionRange` on them. See:
-          // https://html.spec.whatwg.org/multipage/input.html#do-not-apply
-
-          if (!el.value && el.selectionStart === 0 && el.selectionEnd === 0) {
-            // Note: Just setting `0, 0` doesn't fix the issue. Setting
-            // `1, 1` fixes it for the first time that you type text and
-            // then hold delete. Toggling to `1, 1` and then back to
-            // `0, 0` seems to completely fix it.
-            el.setSelectionRange(1, 1);
-            el.setSelectionRange(0, 0);
-          }
-        });
+        _elementRef.nativeElement.addEventListener('keyup', this._iOSKeyupListener);
       });
     }
 
@@ -93682,6 +94206,10 @@ class MatInput extends _MatInputBase {
 
     if (this._platform.isBrowser) {
       this._autofillMonitor.stopMonitoring(this._elementRef.nativeElement);
+    }
+
+    if (this._platform.IOS) {
+      this._elementRef.nativeElement.removeEventListener('keyup', this._iOSKeyupListener);
     }
   }
 
@@ -93851,7 +94379,7 @@ MatInput.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵ
   type: MatInput,
   selectors: [["input", "matInput", ""], ["textarea", "matInput", ""], ["select", "matNativeControl", ""], ["input", "matNativeControl", ""], ["textarea", "matNativeControl", ""]],
   hostAttrs: [1, "mat-input-element", "mat-form-field-autofill-control"],
-  hostVars: 11,
+  hostVars: 12,
   hostBindings: function MatInput_HostBindings(rf, ctx) {
     if (rf & 1) {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵlistener"]("focus", function MatInput_focus_HostBindingHandler() {
@@ -93865,7 +94393,7 @@ MatInput.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵ
 
     if (rf & 2) {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵhostProperty"]("disabled", ctx.disabled)("required", ctx.required);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("id", ctx.id)("data-placeholder", ctx.placeholder)("readonly", ctx.readonly && !ctx._isNativeSelect || null)("aria-invalid", ctx.empty && ctx.required ? null : ctx.errorState)("aria-required", ctx.required);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("id", ctx.id)("data-placeholder", ctx.placeholder)("name", ctx.name || null)("readonly", ctx.readonly && !ctx._isNativeSelect || null)("aria-invalid", ctx.empty && ctx.required ? null : ctx.errorState)("aria-required", ctx.required);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵclassProp"]("mat-input-server", ctx._isServer)("mat-native-select-inline", ctx._isInlineSelect());
     }
   },
@@ -93873,6 +94401,7 @@ MatInput.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵ
     disabled: "disabled",
     id: "id",
     placeholder: "placeholder",
+    name: "name",
     required: "required",
     type: "type",
     errorStateMatcher: "errorStateMatcher",
@@ -93909,6 +94438,7 @@ MatInput.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵ
         '[attr.data-placeholder]': 'placeholder',
         '[disabled]': 'disabled',
         '[required]': 'required',
+        '[attr.name]': 'name || null',
         '[attr.readonly]': 'readonly && !_isNativeSelect || null',
         '[class.mat-native-select-inline]': '_isInlineSelect()',
         // Only mark the input as invalid for assistive technology if it has a value since the
@@ -93979,6 +94509,9 @@ MatInput.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵ
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Input
     }],
     placeholder: [{
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Input
+    }],
+    name: [{
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Input
     }],
     required: [{
@@ -94079,12 +94612,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "MatProgressSpinnerModule": () => (/* binding */ MatProgressSpinnerModule),
 /* harmony export */   "MatSpinner": () => (/* binding */ MatSpinner)
 /* harmony export */ });
+/* harmony import */ var _angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/cdk/coercion */ 6484);
+/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
-/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_material_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/material/core */ 8133);
-/* harmony import */ var _angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/cdk/coercion */ 6484);
-/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
-/* harmony import */ var _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @angular/platform-browser/animations */ 3598);
+/* harmony import */ var _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @angular/platform-browser/animations */ 3598);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! rxjs */ 6078);
+/* harmony import */ var _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/cdk/scrolling */ 5752);
+
+
 
 
 
@@ -94107,59 +94644,38 @@ __webpack_require__.r(__webpack_exports__);
  * @docs-private
  */
 
-function MatProgressSpinner__svg_circle_1_Template(rf, ctx) {
-  if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 3);
-  }
-
-  if (rf & 2) {
-    const ctx_r0 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("animation-name", "mat-progress-spinner-stroke-rotate-" + ctx_r0._spinnerAnimationLabel)("stroke-dashoffset", ctx_r0._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r0._getStrokeCircumference(), "px")("stroke-width", ctx_r0._getCircleStrokeWidth(), "%");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("r", ctx_r0._getCircleRadius());
-  }
-}
-
 function MatProgressSpinner__svg_circle_2_Template(rf, ctx) {
   if (rf & 1) {
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 4);
   }
 
   if (rf & 2) {
     const ctx_r1 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("stroke-dashoffset", ctx_r1._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r1._getStrokeCircumference(), "px")("stroke-width", ctx_r1._getCircleStrokeWidth(), "%");
+
+    const _r0 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵreference"](1);
+
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("animation-name", "mat-progress-spinner-stroke-rotate-" + ctx_r1._spinnerAnimationLabel)("stroke-dashoffset", ctx_r1._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r1._getStrokeCircumference(), "px")("stroke-width", ctx_r1._getCircleStrokeWidth(), "%")("transform-origin", ctx_r1._getCircleTransformOrigin(_r0));
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("r", ctx_r1._getCircleRadius());
   }
 }
 
-function MatSpinner__svg_circle_1_Template(rf, ctx) {
+function MatProgressSpinner__svg_circle_3_Template(rf, ctx) {
   if (rf & 1) {
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 3);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 4);
   }
 
   if (rf & 2) {
-    const ctx_r0 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("animation-name", "mat-progress-spinner-stroke-rotate-" + ctx_r0._spinnerAnimationLabel)("stroke-dashoffset", ctx_r0._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r0._getStrokeCircumference(), "px")("stroke-width", ctx_r0._getCircleStrokeWidth(), "%");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("r", ctx_r0._getCircleRadius());
+    const ctx_r2 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
+
+    const _r0 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵreference"](1);
+
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("stroke-dashoffset", ctx_r2._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r2._getStrokeCircumference(), "px")("stroke-width", ctx_r2._getCircleStrokeWidth(), "%")("transform-origin", ctx_r2._getCircleTransformOrigin(_r0));
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("r", ctx_r2._getCircleRadius());
   }
 }
 
-function MatSpinner__svg_circle_2_Template(rf, ctx) {
-  if (rf & 1) {
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](0, "circle", 3);
-  }
-
-  if (rf & 2) {
-    const ctx_r1 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("stroke-dashoffset", ctx_r1._getStrokeDashOffset(), "px")("stroke-dasharray", ctx_r1._getStrokeCircumference(), "px")("stroke-width", ctx_r1._getCircleStrokeWidth(), "%");
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("r", ctx_r1._getCircleRadius());
-  }
-}
-
-const _c0 = ".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transform-origin:center;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n";
 const BASE_SIZE = 100;
 /**
  * Base reference stroke width of the spinner.
@@ -94223,16 +94739,18 @@ const INDETERMINATE_ANIMATION_TEMPLATE = `
  */
 
 class MatProgressSpinner extends _MatProgressSpinnerBase {
-  constructor(elementRef,
+  constructor(elementRef, _platform, _document, animationMode, defaults,
   /**
-   * @deprecated `_platform` parameter no longer being used.
+   * @deprecated `changeDetectorRef`, `viewportRuler` and `ngZone`
+   * parameters to become required.
    * @breaking-change 14.0.0
    */
-  _platform, _document, animationMode, defaults) {
+  changeDetectorRef, viewportRuler, ngZone) {
     super(elementRef);
     this._document = _document;
     this._diameter = BASE_SIZE;
     this._value = 0;
+    this._resizeSubscription = rxjs__WEBPACK_IMPORTED_MODULE_2__.Subscription.EMPTY;
     /** Mode of the progress circle */
 
     this.mode = 'determinate';
@@ -94246,6 +94764,10 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
 
     this._noopAnimations = animationMode === 'NoopAnimations' && !!defaults && !defaults._forceAnimations;
 
+    if (elementRef.nativeElement.nodeName.toLowerCase() === 'mat-spinner') {
+      this.mode = 'indeterminate';
+    }
+
     if (defaults) {
       if (defaults.diameter) {
         this.diameter = defaults.diameter;
@@ -94254,6 +94776,22 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
       if (defaults.strokeWidth) {
         this.strokeWidth = defaults.strokeWidth;
       }
+    } // Safari has an issue where the circle isn't positioned correctly when the page has a
+    // different zoom level from the default. This handler triggers a recalculation of the
+    // `transform-origin` when the page zoom level changes.
+    // See `_getCircleTransformOrigin` for more info.
+    // @breaking-change 14.0.0 Remove null checks for `_changeDetectorRef`,
+    // `viewportRuler` and `ngZone`.
+
+
+    if (_platform.isBrowser && _platform.SAFARI && viewportRuler && changeDetectorRef && ngZone) {
+      this._resizeSubscription = viewportRuler.change(150).subscribe(() => {
+        // When the window is resize while the spinner is in `indeterminate` mode, we
+        // have to mark for check so the transform origin of the circle can be recomputed.
+        if (this.mode === 'indeterminate') {
+          ngZone.run(() => changeDetectorRef.markForCheck());
+        }
+      });
     }
   }
   /** The diameter of the progress spinner (will set width and height of svg). */
@@ -94264,7 +94802,7 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
   }
 
   set diameter(size) {
-    this._diameter = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_2__.coerceNumberProperty)(size);
+    this._diameter = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_3__.coerceNumberProperty)(size);
     this._spinnerAnimationLabel = this._getSpinnerAnimationLabel(); // If this is set before `ngOnInit`, the style root may not have been resolved yet.
 
     if (this._styleRoot) {
@@ -94279,7 +94817,7 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
   }
 
   set strokeWidth(value) {
-    this._strokeWidth = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_2__.coerceNumberProperty)(value);
+    this._strokeWidth = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_3__.coerceNumberProperty)(value);
   }
   /** Value of the progress circle. */
 
@@ -94289,7 +94827,7 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
   }
 
   set value(newValue) {
-    this._value = Math.max(0, Math.min(100, (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_2__.coerceNumberProperty)(newValue)));
+    this._value = Math.max(0, Math.min(100, (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_3__.coerceNumberProperty)(newValue)));
   }
 
   ngOnInit() {
@@ -94297,11 +94835,15 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
     // Angular seems to create the element outside the shadow root and then moves it inside, if the
     // node is inside an `ngIf` and a ShadowDom-encapsulated component.
 
-    this._styleRoot = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__._getShadowRoot)(element) || this._document.head;
+    this._styleRoot = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_4__._getShadowRoot)(element) || this._document.head;
 
     this._attachStyleNode();
 
     element.classList.add('mat-progress-spinner-indeterminate-animation');
+  }
+
+  ngOnDestroy() {
+    this._resizeSubscription.unsubscribe();
   }
   /** The radius of the spinner, adjusted for stroke width. */
 
@@ -94337,6 +94879,19 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
 
   _getCircleStrokeWidth() {
     return this.strokeWidth / this.diameter * 100;
+  }
+  /** Gets the `transform-origin` for the inner circle element. */
+
+
+  _getCircleTransformOrigin(svg) {
+    var _a; // Safari has an issue where the `transform-origin` doesn't work as expected when the page
+    // has a different zoom level from the default. The problem appears to be that a zoom
+    // is applied on the `svg` node itself. We can work around it by calculating the origin
+    // based on the zoom level. On all other browsers the `currentScale` appears to always be 1.
+
+
+    const scale = ((_a = svg.currentScale) !== null && _a !== void 0 ? _a : 1) * 50;
+    return `${scale}% ${scale}%`;
   }
   /** Dynamically generates a style tag containing the correct animation for this diameter. */
 
@@ -94392,13 +94947,13 @@ class MatProgressSpinner extends _MatProgressSpinnerBase {
 MatProgressSpinner._diameters = new WeakMap();
 
 MatProgressSpinner.ɵfac = function MatProgressSpinner_Factory(t) {
-  return new (t || MatProgressSpinner)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_5__.ANIMATION_MODULE_TYPE, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](MAT_PROGRESS_SPINNER_DEFAULT_OPTIONS));
+  return new (t || MatProgressSpinner)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_4__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_common__WEBPACK_IMPORTED_MODULE_5__.DOCUMENT, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_6__.ANIMATION_MODULE_TYPE, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](MAT_PROGRESS_SPINNER_DEFAULT_OPTIONS), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectorRef), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_7__.ViewportRuler), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone));
 };
 
 MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComponent"]({
   type: MatProgressSpinner,
-  selectors: [["mat-progress-spinner"]],
-  hostAttrs: ["role", "progressbar", "tabindex", "-1", 1, "mat-progress-spinner"],
+  selectors: [["mat-progress-spinner"], ["mat-spinner"]],
+  hostAttrs: ["role", "progressbar", "tabindex", "-1", 1, "mat-progress-spinner", "mat-spinner"],
   hostVars: 10,
   hostBindings: function MatProgressSpinner_HostBindings(rf, ctx) {
     if (rf & 2) {
@@ -94416,15 +94971,15 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
   },
   exportAs: ["matProgressSpinner"],
   features: [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵInheritDefinitionFeature"]],
-  decls: 3,
+  decls: 4,
   vars: 8,
-  consts: [["preserveAspectRatio", "xMidYMid meet", "focusable", "false", "aria-hidden", "true", 3, "ngSwitch"], ["cx", "50%", "cy", "50%", 3, "animation-name", "stroke-dashoffset", "stroke-dasharray", "stroke-width", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%", 3, "stroke-dashoffset", "stroke-dasharray", "stroke-width", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%"]],
+  consts: [["preserveAspectRatio", "xMidYMid meet", "focusable", "false", "aria-hidden", "true", 3, "ngSwitch"], ["svg", ""], ["cx", "50%", "cy", "50%", 3, "animation-name", "stroke-dashoffset", "stroke-dasharray", "stroke-width", "transform-origin", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%", 3, "stroke-dashoffset", "stroke-dasharray", "stroke-width", "transform-origin", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%"]],
   template: function MatProgressSpinner_Template(rf, ctx) {
     if (rf & 1) {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "svg", 0);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, MatProgressSpinner__svg_circle_1_Template, 1, 9, "circle", 1);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, MatProgressSpinner__svg_circle_2_Template, 1, 7, "circle", 2);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "svg", 0, 1);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, MatProgressSpinner__svg_circle_2_Template, 1, 11, "circle", 2);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](3, MatProgressSpinner__svg_circle_3_Template, 1, 9, "circle", 3);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
     }
 
@@ -94432,14 +94987,14 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("width", ctx.diameter, "px")("height", ctx.diameter, "px");
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitch", ctx.mode === "indeterminate");
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("viewBox", ctx._getViewBox());
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](2);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitchCase", true);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitchCase", false);
     }
   },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_4__.NgSwitch, _angular_common__WEBPACK_IMPORTED_MODULE_4__.NgSwitchCase],
-  styles: [".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transform-origin:center;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n"],
+  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_5__.NgSwitch, _angular_common__WEBPACK_IMPORTED_MODULE_5__.NgSwitchCase],
+  styles: [".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -94448,11 +95003,12 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MatProgressSpinner, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Component,
     args: [{
-      selector: 'mat-progress-spinner',
+      selector: 'mat-progress-spinner, mat-spinner',
       exportAs: 'matProgressSpinner',
       host: {
         'role': 'progressbar',
-        'class': 'mat-progress-spinner',
+        // `mat-spinner` is here for backward compatibility.
+        'class': 'mat-progress-spinner mat-spinner',
         // set tab index to -1 so screen readers will read the aria-label
         // Note: there is a known issue with JAWS that does not read progressbar aria labels on FireFox
         'tabindex': '-1',
@@ -94467,21 +95023,21 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
       inputs: ['color'],
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectionStrategy.OnPush,
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewEncapsulation.None,
-      template: "<!--\n  preserveAspectRatio of xMidYMid meet as the center of the viewport is the circle's\n  center. The center of the circle will remain at the center of the mat-progress-spinner\n  element containing the SVG.\n-->\n<!--\n  All children need to be hidden for screen readers in order to support ChromeVox.\n  More context in the issue: https://github.com/angular/components/issues/22165.\n-->\n<svg\n  [style.width.px]=\"diameter\"\n  [style.height.px]=\"diameter\"\n  [attr.viewBox]=\"_getViewBox()\"\n  preserveAspectRatio=\"xMidYMid meet\"\n  focusable=\"false\"\n  [ngSwitch]=\"mode === 'indeterminate'\"\n  aria-hidden=\"true\">\n\n  <!--\n    Technically we can reuse the same `circle` element, however Safari has an issue that breaks\n    the SVG rendering in determinate mode, after switching between indeterminate and determinate.\n    Using a different element avoids the issue. An alternative to this is adding `display: none`\n    for a split second and then removing it when switching between modes, but it's hard to know\n    for how long to hide the element and it can cause the UI to blink.\n  -->\n  <circle\n    *ngSwitchCase=\"true\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.animation-name]=\"'mat-progress-spinner-stroke-rotate-' + _spinnerAnimationLabel\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"></circle>\n\n  <circle\n    *ngSwitchCase=\"false\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"></circle>\n</svg>\n",
-      styles: [".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transform-origin:center;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n"]
+      template: "<!--\n  preserveAspectRatio of xMidYMid meet as the center of the viewport is the circle's\n  center. The center of the circle will remain at the center of the mat-progress-spinner\n  element containing the SVG.\n-->\n<!--\n  All children need to be hidden for screen readers in order to support ChromeVox.\n  More context in the issue: https://github.com/angular/components/issues/22165.\n-->\n<svg\n  [style.width.px]=\"diameter\"\n  [style.height.px]=\"diameter\"\n  [attr.viewBox]=\"_getViewBox()\"\n  preserveAspectRatio=\"xMidYMid meet\"\n  focusable=\"false\"\n  [ngSwitch]=\"mode === 'indeterminate'\"\n  aria-hidden=\"true\"\n  #svg>\n\n  <!--\n    Technically we can reuse the same `circle` element, however Safari has an issue that breaks\n    the SVG rendering in determinate mode, after switching between indeterminate and determinate.\n    Using a different element avoids the issue. An alternative to this is adding `display: none`\n    for a split second and then removing it when switching between modes, but it's hard to know\n    for how long to hide the element and it can cause the UI to blink.\n  -->\n  <circle\n    *ngSwitchCase=\"true\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.animation-name]=\"'mat-progress-spinner-stroke-rotate-' + _spinnerAnimationLabel\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"\n    [style.transform-origin]=\"_getCircleTransformOrigin(svg)\"></circle>\n\n  <circle\n    *ngSwitchCase=\"false\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"\n    [style.transform-origin]=\"_getCircleTransformOrigin(svg)\"></circle>\n</svg>\n",
+      styles: [".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n"]
     }]
   }], function () {
     return [{
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef
     }, {
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_4__.Platform
     }, {
       type: undefined,
       decorators: [{
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Optional
       }, {
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
-        args: [_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT]
+        args: [_angular_common__WEBPACK_IMPORTED_MODULE_5__.DOCUMENT]
       }]
     }, {
       type: undefined,
@@ -94489,7 +95045,7 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Optional
       }, {
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
-        args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_5__.ANIMATION_MODULE_TYPE]
+        args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_6__.ANIMATION_MODULE_TYPE]
       }]
     }, {
       type: undefined,
@@ -94497,6 +95053,12 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
         type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
         args: [MAT_PROGRESS_SPINNER_DEFAULT_OPTIONS]
       }]
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectorRef
+    }, {
+      type: _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_7__.ViewportRuler
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgZone
     }];
   }, {
     diameter: [{
@@ -94512,118 +95074,6 @@ MatProgressSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE
       type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Input
     }]
   });
-})();
-/**
- * `<mat-spinner>` component.
- *
- * This is a component definition to be used as a convenience reference to create an
- * indeterminate `<mat-progress-spinner>` instance.
- */
-
-
-class MatSpinner extends MatProgressSpinner {
-  constructor(elementRef, platform, document, animationMode, defaults) {
-    super(elementRef, platform, document, animationMode, defaults);
-    this.mode = 'indeterminate';
-  }
-
-}
-
-MatSpinner.ɵfac = function MatSpinner_Factory(t) {
-  return new (t || MatSpinner)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_5__.ANIMATION_MODULE_TYPE, 8), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdirectiveInject"](MAT_PROGRESS_SPINNER_DEFAULT_OPTIONS));
-};
-
-MatSpinner.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineComponent"]({
-  type: MatSpinner,
-  selectors: [["mat-spinner"]],
-  hostAttrs: ["role", "progressbar", "mode", "indeterminate", 1, "mat-spinner", "mat-progress-spinner"],
-  hostVars: 6,
-  hostBindings: function MatSpinner_HostBindings(rf, ctx) {
-    if (rf & 2) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("width", ctx.diameter, "px")("height", ctx.diameter, "px");
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵclassProp"]("_mat-animation-noopable", ctx._noopAnimations);
-    }
-  },
-  inputs: {
-    color: "color"
-  },
-  features: [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵInheritDefinitionFeature"]],
-  decls: 3,
-  vars: 8,
-  consts: [["preserveAspectRatio", "xMidYMid meet", "focusable", "false", "aria-hidden", "true", 3, "ngSwitch"], ["cx", "50%", "cy", "50%", 3, "animation-name", "stroke-dashoffset", "stroke-dasharray", "stroke-width", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%", 3, "stroke-dashoffset", "stroke-dasharray", "stroke-width", 4, "ngSwitchCase"], ["cx", "50%", "cy", "50%"]],
-  template: function MatSpinner_Template(rf, ctx) {
-    if (rf & 1) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnamespaceSVG"]();
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "svg", 0);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](1, MatSpinner__svg_circle_1_Template, 1, 9, "circle", 1);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, MatSpinner__svg_circle_2_Template, 1, 7, "circle", 2);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-    }
-
-    if (rf & 2) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵstyleProp"]("width", ctx.diameter, "px")("height", ctx.diameter, "px");
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitch", ctx.mode === "indeterminate");
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("viewBox", ctx._getViewBox());
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitchCase", true);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](1);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngSwitchCase", false);
-    }
-  },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_4__.NgSwitch, _angular_common__WEBPACK_IMPORTED_MODULE_4__.NgSwitchCase],
-  styles: [_c0],
-  encapsulation: 2,
-  changeDetection: 0
-});
-
-(function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MatSpinner, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Component,
-    args: [{
-      selector: 'mat-spinner',
-      host: {
-        'role': 'progressbar',
-        'mode': 'indeterminate',
-        'class': 'mat-spinner mat-progress-spinner',
-        '[class._mat-animation-noopable]': `_noopAnimations`,
-        '[style.width.px]': 'diameter',
-        '[style.height.px]': 'diameter'
-      },
-      inputs: ['color'],
-      changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectionStrategy.OnPush,
-      encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewEncapsulation.None,
-      template: "<!--\n  preserveAspectRatio of xMidYMid meet as the center of the viewport is the circle's\n  center. The center of the circle will remain at the center of the mat-progress-spinner\n  element containing the SVG.\n-->\n<!--\n  All children need to be hidden for screen readers in order to support ChromeVox.\n  More context in the issue: https://github.com/angular/components/issues/22165.\n-->\n<svg\n  [style.width.px]=\"diameter\"\n  [style.height.px]=\"diameter\"\n  [attr.viewBox]=\"_getViewBox()\"\n  preserveAspectRatio=\"xMidYMid meet\"\n  focusable=\"false\"\n  [ngSwitch]=\"mode === 'indeterminate'\"\n  aria-hidden=\"true\">\n\n  <!--\n    Technically we can reuse the same `circle` element, however Safari has an issue that breaks\n    the SVG rendering in determinate mode, after switching between indeterminate and determinate.\n    Using a different element avoids the issue. An alternative to this is adding `display: none`\n    for a split second and then removing it when switching between modes, but it's hard to know\n    for how long to hide the element and it can cause the UI to blink.\n  -->\n  <circle\n    *ngSwitchCase=\"true\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.animation-name]=\"'mat-progress-spinner-stroke-rotate-' + _spinnerAnimationLabel\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"></circle>\n\n  <circle\n    *ngSwitchCase=\"false\"\n    cx=\"50%\"\n    cy=\"50%\"\n    [attr.r]=\"_getCircleRadius()\"\n    [style.stroke-dashoffset.px]=\"_getStrokeDashOffset()\"\n    [style.stroke-dasharray.px]=\"_getStrokeCircumference()\"\n    [style.stroke-width.%]=\"_getCircleStrokeWidth()\"></circle>\n</svg>\n",
-      styles: [".mat-progress-spinner{display:block;position:relative;overflow:hidden}.mat-progress-spinner svg{position:absolute;transform:rotate(-90deg);top:0;left:0;transform-origin:center;overflow:visible}.mat-progress-spinner circle{fill:transparent;transform-origin:center;transition:stroke-dashoffset 225ms linear}._mat-animation-noopable.mat-progress-spinner circle{transition:none;animation:none}.cdk-high-contrast-active .mat-progress-spinner circle{stroke:CanvasText}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{animation:mat-progress-spinner-linear-rotate 2000ms linear infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] svg{transition:none;animation:none}.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition-property:stroke;animation-duration:4000ms;animation-timing-function:cubic-bezier(0.35, 0, 0.25, 1);animation-iteration-count:infinite}._mat-animation-noopable.mat-progress-spinner.mat-progress-spinner-indeterminate-animation[mode=indeterminate] circle{transition:none;animation:none}@keyframes mat-progress-spinner-linear-rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes mat-progress-spinner-stroke-rotate-100{0%{stroke-dashoffset:268.606171575px;transform:rotate(0)}12.5%{stroke-dashoffset:56.5486677px;transform:rotate(0)}12.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(72.5deg)}25%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(72.5deg)}25.0001%{stroke-dashoffset:268.606171575px;transform:rotate(270deg)}37.5%{stroke-dashoffset:56.5486677px;transform:rotate(270deg)}37.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(161.5deg)}50%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(161.5deg)}50.0001%{stroke-dashoffset:268.606171575px;transform:rotate(180deg)}62.5%{stroke-dashoffset:56.5486677px;transform:rotate(180deg)}62.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(251.5deg)}75%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(251.5deg)}75.0001%{stroke-dashoffset:268.606171575px;transform:rotate(90deg)}87.5%{stroke-dashoffset:56.5486677px;transform:rotate(90deg)}87.5001%{stroke-dashoffset:56.5486677px;transform:rotateX(180deg) rotate(341.5deg)}100%{stroke-dashoffset:268.606171575px;transform:rotateX(180deg) rotate(341.5deg)}}\n"]
-    }]
-  }], function () {
-    return [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef
-    }, {
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_3__.Platform
-    }, {
-      type: undefined,
-      decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Optional
-      }, {
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
-        args: [_angular_common__WEBPACK_IMPORTED_MODULE_4__.DOCUMENT]
-      }]
-    }, {
-      type: undefined,
-      decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Optional
-      }, {
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
-        args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_5__.ANIMATION_MODULE_TYPE]
-      }]
-    }, {
-      type: undefined,
-      decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
-        args: [MAT_PROGRESS_SPINNER_DEFAULT_OPTIONS]
-      }]
-    }];
-  }, null);
 })();
 /**
  * @license
@@ -94644,16 +95094,16 @@ MatProgressSpinnerModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_
   type: MatProgressSpinnerModule
 });
 MatProgressSpinnerModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({
-  imports: [[_angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule, _angular_common__WEBPACK_IMPORTED_MODULE_4__.CommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule]
+  imports: [[_angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule, _angular_common__WEBPACK_IMPORTED_MODULE_5__.CommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MatProgressSpinnerModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [_angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule, _angular_common__WEBPACK_IMPORTED_MODULE_4__.CommonModule],
-      exports: [MatProgressSpinner, MatSpinner, _angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule],
-      declarations: [MatProgressSpinner, MatSpinner]
+      imports: [_angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule, _angular_common__WEBPACK_IMPORTED_MODULE_5__.CommonModule],
+      exports: [MatProgressSpinner, _angular_material_core__WEBPACK_IMPORTED_MODULE_1__.MatCommonModule],
+      declarations: [MatProgressSpinner]
     }]
   }], null, null);
 })();
@@ -94666,6 +95116,15 @@ MatProgressSpinnerModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_
  */
 
 /**
+ * @deprecated Import `MatProgressSpinner` instead. Note that the
+ *    `mat-spinner` selector isn't deprecated.
+ * @breaking-change 8.0.0
+ */
+// tslint:disable-next-line:variable-name
+
+
+const MatSpinner = MatProgressSpinner;
+/**
  * @license
  * Copyright Google LLC All Rights Reserved.
  *
@@ -94676,7 +95135,6 @@ MatProgressSpinnerModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_
 /**
  * Generated bundle index. Do not edit.
  */
-
 
 
 
@@ -94993,11 +95451,11 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
     }
   },
   hostAttrs: [1, "mat-slide-toggle"],
-  hostVars: 12,
+  hostVars: 13,
   hostBindings: function MatSlideToggle_HostBindings(rf, ctx) {
     if (rf & 2) {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵhostProperty"]("id", ctx.id);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("tabindex", null)("aria-label", null)("aria-labelledby", null);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("tabindex", null)("aria-label", null)("aria-labelledby", null)("name", null);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵclassProp"]("mat-checked", ctx.checked)("mat-disabled", ctx.disabled)("mat-slide-toggle-label-before", ctx.labelPosition == "before")("_mat-animation-noopable", ctx._noopAnimations);
     }
   },
@@ -95029,7 +95487,7 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
     if (rf & 1) {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵprojectionDef"]();
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "label", 0, 1);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](2, "div", 2, 3);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](2, "span", 2, 3);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](4, "input", 4, 5);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵlistener"]("change", function MatSlideToggle_Template_input_change_4_listener($event) {
         return ctx._onChangeEvent($event);
@@ -95037,10 +95495,10 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
         return ctx._onInputClick($event);
       });
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](6, "div", 6, 7);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](8, "div", 8);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](9, "div", 9);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](10, "div", 10);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](6, "span", 6, 7);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](8, "span", 8);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](9, "span", 9);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelement"](10, "span", 10);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
@@ -95066,13 +95524,13 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵclassProp"]("mat-slide-toggle-bar-no-side-margin", !_r4.textContent || !_r4.textContent.trim());
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](2);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("id", ctx.inputId)("required", ctx.required)("tabIndex", ctx.tabIndex)("checked", ctx.checked)("disabled", ctx.disabled);
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("name", ctx.name)("aria-checked", ctx.checked.toString())("aria-label", ctx.ariaLabel)("aria-labelledby", ctx.ariaLabelledby)("aria-describedby", ctx.ariaDescribedby);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵattribute"]("name", ctx.name)("aria-checked", ctx.checked)("aria-label", ctx.ariaLabel)("aria-labelledby", ctx.ariaLabelledby)("aria-describedby", ctx.ariaDescribedby);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵadvance"](5);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("matRippleTrigger", _r0)("matRippleDisabled", ctx.disableRipple || ctx.disabled)("matRippleCentered", true)("matRippleRadius", 20)("matRippleAnimation", _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵpureFunction1"](18, _c3, ctx._noopAnimations ? 0 : 150));
     }
   },
   directives: [_angular_material_core__WEBPACK_IMPORTED_MODULE_2__.MatRipple, _angular_cdk_observers__WEBPACK_IMPORTED_MODULE_6__.CdkObserveContent],
-  styles: [".mat-slide-toggle{display:inline-block;height:24px;max-width:100%;line-height:24px;white-space:nowrap;outline:none;-webkit-tap-highlight-color:transparent}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px, 0, 0)}[dir=rtl] .mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(-16px, 0, 0)}.mat-slide-toggle.mat-disabled{opacity:.38}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-label{-webkit-user-select:none;-moz-user-select:none;user-select:none;display:flex;flex:1;flex-direction:row;align-items:center;height:inherit;cursor:pointer}.mat-slide-toggle-content{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar,.mat-slide-toggle-bar{margin-right:8px;margin-left:0}[dir=rtl] .mat-slide-toggle-bar,.mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-bar-no-side-margin{margin-left:0;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0, 0, 0);transition:all 80ms linear;transition-property:transform}._mat-animation-noopable .mat-slide-toggle-thumb-container{transition:none}[dir=rtl] .mat-slide-toggle-thumb-container{left:auto;right:0}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;flex-shrink:0;border-radius:8px}.mat-slide-toggle-input{bottom:0;left:10px}[dir=rtl] .mat-slide-toggle-input{left:auto;right:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}._mat-animation-noopable .mat-slide-toggle-bar,._mat-animation-noopable .mat-slide-toggle-thumb{transition:none}.mat-slide-toggle .mat-slide-toggle-ripple{position:absolute;top:calc(50% - 20px);left:calc(50% - 20px);height:40px;width:40px;z-index:1;pointer-events:none}.mat-slide-toggle .mat-slide-toggle-ripple .mat-ripple-element:not(.mat-slide-toggle-persistent-ripple){opacity:.12}.mat-slide-toggle-persistent-ripple{width:100%;height:100%;transform:none}.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:.04}.mat-slide-toggle:not(.mat-disabled).cdk-keyboard-focused .mat-slide-toggle-persistent-ripple{opacity:.12}.mat-slide-toggle-persistent-ripple,.mat-slide-toggle.mat-disabled .mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:0}@media(hover: none){.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{display:none}}.cdk-high-contrast-active .mat-slide-toggle-thumb,.cdk-high-contrast-active .mat-slide-toggle-bar{border:1px solid}.cdk-high-contrast-active .mat-slide-toggle.cdk-keyboard-focused .mat-slide-toggle-bar{outline:2px dotted;outline-offset:5px}\n"],
+  styles: [".mat-slide-toggle{display:inline-block;height:24px;max-width:100%;line-height:24px;white-space:nowrap;outline:none;-webkit-tap-highlight-color:transparent}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px, 0, 0)}[dir=rtl] .mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(-16px, 0, 0)}.mat-slide-toggle.mat-disabled{opacity:.38}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-label{-webkit-user-select:none;user-select:none;display:flex;flex:1;flex-direction:row;align-items:center;height:inherit;cursor:pointer}.mat-slide-toggle-content{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar,.mat-slide-toggle-bar{margin-right:8px;margin-left:0}[dir=rtl] .mat-slide-toggle-bar,.mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-bar-no-side-margin{margin-left:0;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0, 0, 0);transition:all 80ms linear;transition-property:transform}._mat-animation-noopable .mat-slide-toggle-thumb-container{transition:none}[dir=rtl] .mat-slide-toggle-thumb-container{left:auto;right:0}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%;display:block}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;flex-shrink:0;border-radius:8px}.mat-slide-toggle-input{bottom:0;left:10px}[dir=rtl] .mat-slide-toggle-input{left:auto;right:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}._mat-animation-noopable .mat-slide-toggle-bar,._mat-animation-noopable .mat-slide-toggle-thumb{transition:none}.mat-slide-toggle .mat-slide-toggle-ripple{position:absolute;top:calc(50% - 20px);left:calc(50% - 20px);height:40px;width:40px;z-index:1;pointer-events:none}.mat-slide-toggle .mat-slide-toggle-ripple .mat-ripple-element:not(.mat-slide-toggle-persistent-ripple){opacity:.12}.mat-slide-toggle-persistent-ripple{width:100%;height:100%;transform:none}.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:.04}.mat-slide-toggle:not(.mat-disabled).cdk-keyboard-focused .mat-slide-toggle-persistent-ripple{opacity:.12}.mat-slide-toggle-persistent-ripple,.mat-slide-toggle.mat-disabled .mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:0}@media(hover: none){.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{display:none}}.cdk-high-contrast-active .mat-slide-toggle-thumb,.cdk-high-contrast-active .mat-slide-toggle-bar{border:1px solid}.cdk-high-contrast-active .mat-slide-toggle.cdk-keyboard-focused .mat-slide-toggle-bar{outline:2px dotted;outline-offset:5px}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -95090,6 +95548,7 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
         '[attr.tabindex]': 'null',
         '[attr.aria-label]': 'null',
         '[attr.aria-labelledby]': 'null',
+        '[attr.name]': 'null',
         '[class.mat-checked]': 'checked',
         '[class.mat-disabled]': 'disabled',
         '[class.mat-slide-toggle-label-before]': 'labelPosition == "before"',
@@ -95099,8 +95558,8 @@ MatSlideToggle.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
       inputs: ['disabled', 'disableRipple', 'color', 'tabIndex'],
       encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewEncapsulation.None,
       changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_0__.ChangeDetectionStrategy.OnPush,
-      template: "<label [attr.for]=\"inputId\" class=\"mat-slide-toggle-label\" #label>\n  <div #toggleBar class=\"mat-slide-toggle-bar\"\n       [class.mat-slide-toggle-bar-no-side-margin]=\"!labelContent.textContent || !labelContent.textContent.trim()\">\n\n    <input #input class=\"mat-slide-toggle-input cdk-visually-hidden\" type=\"checkbox\"\n           role=\"switch\"\n           [id]=\"inputId\"\n           [required]=\"required\"\n           [tabIndex]=\"tabIndex\"\n           [checked]=\"checked\"\n           [disabled]=\"disabled\"\n           [attr.name]=\"name\"\n           [attr.aria-checked]=\"checked.toString()\"\n           [attr.aria-label]=\"ariaLabel\"\n           [attr.aria-labelledby]=\"ariaLabelledby\"\n           [attr.aria-describedby]=\"ariaDescribedby\"\n           (change)=\"_onChangeEvent($event)\"\n           (click)=\"_onInputClick($event)\">\n\n    <div class=\"mat-slide-toggle-thumb-container\" #thumbContainer>\n      <div class=\"mat-slide-toggle-thumb\"></div>\n      <div class=\"mat-slide-toggle-ripple mat-focus-indicator\" mat-ripple\n           [matRippleTrigger]=\"label\"\n           [matRippleDisabled]=\"disableRipple || disabled\"\n           [matRippleCentered]=\"true\"\n           [matRippleRadius]=\"20\"\n           [matRippleAnimation]=\"{enterDuration: _noopAnimations ? 0 : 150}\">\n\n        <div class=\"mat-ripple-element mat-slide-toggle-persistent-ripple\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <span class=\"mat-slide-toggle-content\" #labelContent (cdkObserveContent)=\"_onLabelTextChange()\">\n    <!-- Add an invisible span so JAWS can read the label -->\n    <span style=\"display:none\">&nbsp;</span>\n    <ng-content></ng-content>\n  </span>\n</label>\n",
-      styles: [".mat-slide-toggle{display:inline-block;height:24px;max-width:100%;line-height:24px;white-space:nowrap;outline:none;-webkit-tap-highlight-color:transparent}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px, 0, 0)}[dir=rtl] .mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(-16px, 0, 0)}.mat-slide-toggle.mat-disabled{opacity:.38}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-label{-webkit-user-select:none;-moz-user-select:none;user-select:none;display:flex;flex:1;flex-direction:row;align-items:center;height:inherit;cursor:pointer}.mat-slide-toggle-content{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar,.mat-slide-toggle-bar{margin-right:8px;margin-left:0}[dir=rtl] .mat-slide-toggle-bar,.mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-bar-no-side-margin{margin-left:0;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0, 0, 0);transition:all 80ms linear;transition-property:transform}._mat-animation-noopable .mat-slide-toggle-thumb-container{transition:none}[dir=rtl] .mat-slide-toggle-thumb-container{left:auto;right:0}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;flex-shrink:0;border-radius:8px}.mat-slide-toggle-input{bottom:0;left:10px}[dir=rtl] .mat-slide-toggle-input{left:auto;right:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}._mat-animation-noopable .mat-slide-toggle-bar,._mat-animation-noopable .mat-slide-toggle-thumb{transition:none}.mat-slide-toggle .mat-slide-toggle-ripple{position:absolute;top:calc(50% - 20px);left:calc(50% - 20px);height:40px;width:40px;z-index:1;pointer-events:none}.mat-slide-toggle .mat-slide-toggle-ripple .mat-ripple-element:not(.mat-slide-toggle-persistent-ripple){opacity:.12}.mat-slide-toggle-persistent-ripple{width:100%;height:100%;transform:none}.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:.04}.mat-slide-toggle:not(.mat-disabled).cdk-keyboard-focused .mat-slide-toggle-persistent-ripple{opacity:.12}.mat-slide-toggle-persistent-ripple,.mat-slide-toggle.mat-disabled .mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:0}@media(hover: none){.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{display:none}}.cdk-high-contrast-active .mat-slide-toggle-thumb,.cdk-high-contrast-active .mat-slide-toggle-bar{border:1px solid}.cdk-high-contrast-active .mat-slide-toggle.cdk-keyboard-focused .mat-slide-toggle-bar{outline:2px dotted;outline-offset:5px}\n"]
+      template: "<label [attr.for]=\"inputId\" class=\"mat-slide-toggle-label\" #label>\n  <span #toggleBar class=\"mat-slide-toggle-bar\"\n       [class.mat-slide-toggle-bar-no-side-margin]=\"!labelContent.textContent || !labelContent.textContent.trim()\">\n\n    <input #input class=\"mat-slide-toggle-input cdk-visually-hidden\" type=\"checkbox\"\n           role=\"switch\"\n           [id]=\"inputId\"\n           [required]=\"required\"\n           [tabIndex]=\"tabIndex\"\n           [checked]=\"checked\"\n           [disabled]=\"disabled\"\n           [attr.name]=\"name\"\n           [attr.aria-checked]=\"checked\"\n           [attr.aria-label]=\"ariaLabel\"\n           [attr.aria-labelledby]=\"ariaLabelledby\"\n           [attr.aria-describedby]=\"ariaDescribedby\"\n           (change)=\"_onChangeEvent($event)\"\n           (click)=\"_onInputClick($event)\">\n\n    <span class=\"mat-slide-toggle-thumb-container\" #thumbContainer>\n      <span class=\"mat-slide-toggle-thumb\"></span>\n      <span class=\"mat-slide-toggle-ripple mat-focus-indicator\" mat-ripple\n           [matRippleTrigger]=\"label\"\n           [matRippleDisabled]=\"disableRipple || disabled\"\n           [matRippleCentered]=\"true\"\n           [matRippleRadius]=\"20\"\n           [matRippleAnimation]=\"{enterDuration: _noopAnimations ? 0 : 150}\">\n\n        <span class=\"mat-ripple-element mat-slide-toggle-persistent-ripple\"></span>\n      </span>\n    </span>\n\n  </span>\n\n  <span class=\"mat-slide-toggle-content\" #labelContent (cdkObserveContent)=\"_onLabelTextChange()\">\n    <!-- Add an invisible span so JAWS can read the label -->\n    <span style=\"display:none\">&nbsp;</span>\n    <ng-content></ng-content>\n  </span>\n</label>\n",
+      styles: [".mat-slide-toggle{display:inline-block;height:24px;max-width:100%;line-height:24px;white-space:nowrap;outline:none;-webkit-tap-highlight-color:transparent}.mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(16px, 0, 0)}[dir=rtl] .mat-slide-toggle.mat-checked .mat-slide-toggle-thumb-container{transform:translate3d(-16px, 0, 0)}.mat-slide-toggle.mat-disabled{opacity:.38}.mat-slide-toggle.mat-disabled .mat-slide-toggle-label,.mat-slide-toggle.mat-disabled .mat-slide-toggle-thumb-container{cursor:default}.mat-slide-toggle-label{-webkit-user-select:none;user-select:none;display:flex;flex:1;flex-direction:row;align-items:center;height:inherit;cursor:pointer}.mat-slide-toggle-content{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mat-slide-toggle-label-before .mat-slide-toggle-label{order:1}.mat-slide-toggle-label-before .mat-slide-toggle-bar{order:2}[dir=rtl] .mat-slide-toggle-label-before .mat-slide-toggle-bar,.mat-slide-toggle-bar{margin-right:8px;margin-left:0}[dir=rtl] .mat-slide-toggle-bar,.mat-slide-toggle-label-before .mat-slide-toggle-bar{margin-left:8px;margin-right:0}.mat-slide-toggle-bar-no-side-margin{margin-left:0;margin-right:0}.mat-slide-toggle-thumb-container{position:absolute;z-index:1;width:20px;height:20px;top:-3px;left:0;transform:translate3d(0, 0, 0);transition:all 80ms linear;transition-property:transform}._mat-animation-noopable .mat-slide-toggle-thumb-container{transition:none}[dir=rtl] .mat-slide-toggle-thumb-container{left:auto;right:0}.mat-slide-toggle-thumb{height:20px;width:20px;border-radius:50%;display:block}.mat-slide-toggle-bar{position:relative;width:36px;height:14px;flex-shrink:0;border-radius:8px}.mat-slide-toggle-input{bottom:0;left:10px}[dir=rtl] .mat-slide-toggle-input{left:auto;right:10px}.mat-slide-toggle-bar,.mat-slide-toggle-thumb{transition:all 80ms linear;transition-property:background-color;transition-delay:50ms}._mat-animation-noopable .mat-slide-toggle-bar,._mat-animation-noopable .mat-slide-toggle-thumb{transition:none}.mat-slide-toggle .mat-slide-toggle-ripple{position:absolute;top:calc(50% - 20px);left:calc(50% - 20px);height:40px;width:40px;z-index:1;pointer-events:none}.mat-slide-toggle .mat-slide-toggle-ripple .mat-ripple-element:not(.mat-slide-toggle-persistent-ripple){opacity:.12}.mat-slide-toggle-persistent-ripple{width:100%;height:100%;transform:none}.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:.04}.mat-slide-toggle:not(.mat-disabled).cdk-keyboard-focused .mat-slide-toggle-persistent-ripple{opacity:.12}.mat-slide-toggle-persistent-ripple,.mat-slide-toggle.mat-disabled .mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{opacity:0}@media(hover: none){.mat-slide-toggle-bar:hover .mat-slide-toggle-persistent-ripple{display:none}}.cdk-high-contrast-active .mat-slide-toggle-thumb,.cdk-high-contrast-active .mat-slide-toggle-bar{border:1px solid}.cdk-high-contrast-active .mat-slide-toggle.cdk-keyboard-focused .mat-slide-toggle-bar{outline:2px dotted;outline-offset:5px}\n"]
     }]
   }], function () {
     return [{
@@ -95323,14 +95782,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "MatSnackBarModule": () => (/* binding */ MatSnackBarModule),
 /* harmony export */   "MatSnackBarRef": () => (/* binding */ MatSnackBarRef),
 /* harmony export */   "SimpleSnackBar": () => (/* binding */ SimpleSnackBar),
+/* harmony export */   "_MatSnackBarBase": () => (/* binding */ _MatSnackBarBase),
 /* harmony export */   "matSnackBarAnimations": () => (/* binding */ matSnackBarAnimations)
 /* harmony export */ });
 /* harmony import */ var _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @angular/cdk/overlay */ 4244);
 /* harmony import */ var _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @angular/cdk/portal */ 4476);
-/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ 6362);
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ 3184);
 /* harmony import */ var _angular_material_core__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/material/core */ 8133);
-/* harmony import */ var _angular_material_button__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/material/button */ 7317);
+/* harmony import */ var _angular_material_button__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/material/button */ 7317);
 /* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! rxjs */ 228);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 9295);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! rxjs/operators */ 8951);
@@ -95370,8 +95830,8 @@ function SimpleSnackBar_div_2_Template(rf, ctx) {
   if (rf & 1) {
     const _r2 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵgetCurrentView"]();
 
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div", 1);
-    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](1, "button", 2);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "div", 2);
+    _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](1, "button", 3);
     _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵlistener"]("click", function SimpleSnackBar_div_2_Template_button_click_1_listener() {
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵrestoreView"](_r2);
       const ctx_r1 = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵnextContext"]();
@@ -95452,9 +95912,7 @@ class MatSnackBarRef {
     /** Whether the snack bar was dismissed using the action button. */
 
     this._dismissedByAction = false;
-    this.containerInstance = containerInstance; // Dismiss snackbar on action.
-
-    this.onAction().subscribe(() => this.dismiss());
+    this.containerInstance = containerInstance;
 
     containerInstance._onExit.subscribe(() => this._finishDismiss());
   }
@@ -95478,6 +95936,8 @@ class MatSnackBarRef {
       this._onAction.next();
 
       this._onAction.complete();
+
+      this.dismiss();
     }
 
     clearTimeout(this._durationTimeoutId);
@@ -95592,13 +96052,13 @@ SimpleSnackBar.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
   hostAttrs: [1, "mat-simple-snackbar"],
   decls: 3,
   vars: 2,
-  consts: [["class", "mat-simple-snackbar-action", 4, "ngIf"], [1, "mat-simple-snackbar-action"], ["mat-button", "", 3, "click"]],
+  consts: [[1, "mat-simple-snack-bar-content"], ["class", "mat-simple-snackbar-action", 4, "ngIf"], [1, "mat-simple-snackbar-action"], ["mat-button", "", 3, "click"]],
   template: function SimpleSnackBar_Template(rf, ctx) {
     if (rf & 1) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "span");
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementStart"](0, "span", 0);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtext"](1);
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵelementEnd"]();
-      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, SimpleSnackBar_div_2_Template, 3, 1, "div", 0);
+      _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵtemplate"](2, SimpleSnackBar_div_2_Template, 3, 1, "div", 1);
     }
 
     if (rf & 2) {
@@ -95608,8 +96068,8 @@ SimpleSnackBar.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
       _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵproperty"]("ngIf", ctx.hasAction);
     }
   },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_2__.NgIf, _angular_material_button__WEBPACK_IMPORTED_MODULE_3__.MatButton],
-  styles: [".mat-simple-snackbar{display:flex;justify-content:space-between;align-items:center;line-height:20px;opacity:1}.mat-simple-snackbar-action{flex-shrink:0;margin:-8px -8px -8px 8px}.mat-simple-snackbar-action button{max-height:36px;min-width:0}[dir=rtl] .mat-simple-snackbar-action{margin-left:-8px;margin-right:8px}\n"],
+  directives: [_angular_material_button__WEBPACK_IMPORTED_MODULE_2__.MatButton, _angular_common__WEBPACK_IMPORTED_MODULE_3__.NgIf],
+  styles: [".mat-simple-snackbar{display:flex;justify-content:space-between;align-items:center;line-height:20px;opacity:1}.mat-simple-snackbar-action{flex-shrink:0;margin:-8px -8px -8px 8px}.mat-simple-snackbar-action button{max-height:36px;min-width:0}[dir=rtl] .mat-simple-snackbar-action{margin-left:-8px;margin-right:8px}.mat-simple-snack-bar-content{overflow:hidden;text-overflow:ellipsis}\n"],
   encapsulation: 2,
   changeDetection: 0
 });
@@ -95624,8 +96084,8 @@ SimpleSnackBar.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__
       host: {
         'class': 'mat-simple-snackbar'
       },
-      template: "<span>{{data.message}}</span>\n<div class=\"mat-simple-snackbar-action\"  *ngIf=\"hasAction\">\n  <button mat-button (click)=\"action()\">{{data.action}}</button>\n</div>\n",
-      styles: [".mat-simple-snackbar{display:flex;justify-content:space-between;align-items:center;line-height:20px;opacity:1}.mat-simple-snackbar-action{flex-shrink:0;margin:-8px -8px -8px 8px}.mat-simple-snackbar-action button{max-height:36px;min-width:0}[dir=rtl] .mat-simple-snackbar-action{margin-left:-8px;margin-right:8px}\n"]
+      template: "<span class=\"mat-simple-snack-bar-content\">{{data.message}}</span>\n<div class=\"mat-simple-snackbar-action\"  *ngIf=\"hasAction\">\n  <button mat-button (click)=\"action()\">{{data.action}}</button>\n</div>\n",
+      styles: [".mat-simple-snackbar{display:flex;justify-content:space-between;align-items:center;line-height:20px;opacity:1}.mat-simple-snackbar-action{flex-shrink:0;margin:-8px -8px -8px 8px}.mat-simple-snackbar-action button{max-height:36px;min-width:0}[dir=rtl] .mat-simple-snackbar-action{margin-left:-8px;margin-right:8px}.mat-simple-snack-bar-content{overflow:hidden;text-overflow:ellipsis}\n"]
     }]
   }], function () {
     return [{
@@ -95794,18 +96254,23 @@ class MatSnackBarContainer extends _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_
 
 
   exit() {
-    // Note: this one transitions to `hidden`, rather than `void`, in order to handle the case
-    // where multiple snack bars are opened in quick succession (e.g. two consecutive calls to
-    // `MatSnackBar.open`).
-    this._animationState = 'hidden'; // Mark this element with an 'exit' attribute to indicate that the snackbar has
-    // been dismissed and will soon be removed from the DOM. This is used by the snackbar
-    // test harness.
+    // It's common for snack bars to be opened by random outside calls like HTTP requests or
+    // errors. Run inside the NgZone to ensure that it functions correctly.
+    this._ngZone.run(() => {
+      // Note: this one transitions to `hidden`, rather than `void`, in order to handle the case
+      // where multiple snack bars are opened in quick succession (e.g. two consecutive calls to
+      // `MatSnackBar.open`).
+      this._animationState = 'hidden'; // Mark this element with an 'exit' attribute to indicate that the snackbar has
+      // been dismissed and will soon be removed from the DOM. This is used by the snackbar
+      // test harness.
 
-    this._elementRef.nativeElement.setAttribute('mat-exit', ''); // If the snack bar hasn't been announced by the time it exits it wouldn't have been open
-    // long enough to visually read it either, so clear the timeout for announcing.
+      this._elementRef.nativeElement.setAttribute('mat-exit', ''); // If the snack bar hasn't been announced by the time it exits it wouldn't have been open
+      // long enough to visually read it either, so clear the timeout for announcing.
 
 
-    clearTimeout(this._announceTimeoutId);
+      clearTimeout(this._announceTimeoutId);
+    });
+
     return this._onExit;
   }
   /** Makes sure the exit callbacks have been invoked when the element is destroyed. */
@@ -95824,9 +96289,11 @@ class MatSnackBarContainer extends _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_
 
   _completeExit() {
     this._ngZone.onMicrotaskEmpty.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.take)(1)).subscribe(() => {
-      this._onExit.next();
+      this._ngZone.run(() => {
+        this._onExit.next();
 
-      this._onExit.complete();
+        this._onExit.complete();
+      });
     });
   }
   /** Applies the various positioning and user-configured CSS classes to the snack bar. */
@@ -96011,14 +96478,14 @@ MatSnackBarModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_
   type: MatSnackBarModule
 });
 MatSnackBarModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjector"]({
-  imports: [[_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.OverlayModule, _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_5__.PortalModule, _angular_common__WEBPACK_IMPORTED_MODULE_2__.CommonModule, _angular_material_button__WEBPACK_IMPORTED_MODULE_3__.MatButtonModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule]
+  imports: [[_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.OverlayModule, _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_5__.PortalModule, _angular_common__WEBPACK_IMPORTED_MODULE_3__.CommonModule, _angular_material_button__WEBPACK_IMPORTED_MODULE_2__.MatButtonModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule]
 });
 
 (function () {
   (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](MatSnackBarModule, [{
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
-      imports: [_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.OverlayModule, _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_5__.PortalModule, _angular_common__WEBPACK_IMPORTED_MODULE_2__.CommonModule, _angular_material_button__WEBPACK_IMPORTED_MODULE_3__.MatButtonModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule],
+      imports: [_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.OverlayModule, _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_5__.PortalModule, _angular_common__WEBPACK_IMPORTED_MODULE_3__.CommonModule, _angular_material_button__WEBPACK_IMPORTED_MODULE_2__.MatButtonModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule],
       exports: [MatSnackBarContainer, _angular_material_core__WEBPACK_IMPORTED_MODULE_9__.MatCommonModule],
       declarations: [MatSnackBarContainer, SimpleSnackBar]
     }]
@@ -96036,12 +96503,8 @@ const MAT_SNACK_BAR_DEFAULT_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODULE
 function MAT_SNACK_BAR_DEFAULT_OPTIONS_FACTORY() {
   return new MatSnackBarConfig();
 }
-/**
- * Service to dispatch Material Design snack bar messages.
- */
 
-
-class MatSnackBar {
+class _MatSnackBarBase {
   constructor(_overlay, _live, _injector, _breakpointObserver, _parentSnackBar, _defaultConfig) {
     this._overlay = _overlay;
     this._live = _live;
@@ -96056,15 +96519,6 @@ class MatSnackBar {
      */
 
     this._snackBarRefAtThisLevel = null;
-    /** The component that should be rendered as the snack bar's simple component. */
-
-    this.simpleSnackBarComponent = SimpleSnackBar;
-    /** The container component that attaches the provided template or component. */
-
-    this.snackBarContainerComponent = MatSnackBarContainer;
-    /** The CSS class to apply for handset mode. */
-
-    this.handsetCssClass = 'mat-snack-bar-handset';
   }
   /** Reference to the currently opened snackbar at *any* level. */
 
@@ -96302,6 +96756,58 @@ class MatSnackBar {
         useValue: config.data
       }]
     });
+  }
+
+}
+
+_MatSnackBarBase.ɵfac = function _MatSnackBarBase_Factory(t) {
+  return new (t || _MatSnackBarBase)(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.Overlay), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_12__.LiveAnnouncer), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_core__WEBPACK_IMPORTED_MODULE_0__.Injector), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_angular_cdk_layout__WEBPACK_IMPORTED_MODULE_10__.BreakpointObserver), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](_MatSnackBarBase, 12), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵinject"](MAT_SNACK_BAR_DEFAULT_OPTIONS));
+};
+
+_MatSnackBarBase.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵɵdefineInjectable"]({
+  token: _MatSnackBarBase,
+  factory: _MatSnackBarBase.ɵfac
+});
+
+(function () {
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵsetClassMetadata"](_MatSnackBarBase, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injectable
+  }], function () {
+    return [{
+      type: _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_8__.Overlay
+    }, {
+      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_12__.LiveAnnouncer
+    }, {
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Injector
+    }, {
+      type: _angular_cdk_layout__WEBPACK_IMPORTED_MODULE_10__.BreakpointObserver
+    }, {
+      type: _MatSnackBarBase,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.SkipSelf
+      }]
+    }, {
+      type: MatSnackBarConfig,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.Inject,
+        args: [MAT_SNACK_BAR_DEFAULT_OPTIONS]
+      }]
+    }];
+  }, null);
+})();
+/**
+ * Service to dispatch Material Design snack bar messages.
+ */
+
+
+class MatSnackBar extends _MatSnackBarBase {
+  constructor(overlay, live, injector, breakpointObserver, parentSnackBar, defaultConfig) {
+    super(overlay, live, injector, breakpointObserver, parentSnackBar, defaultConfig);
+    this.simpleSnackBarComponent = SimpleSnackBar;
+    this.snackBarContainerComponent = MatSnackBarContainer;
+    this.handsetCssClass = 'mat-snack-bar-handset';
   }
 
 }
@@ -96639,22 +97145,23 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "getMatTooltipInvalidPositionError": () => (/* binding */ getMatTooltipInvalidPositionError),
 /* harmony export */   "matTooltipAnimations": () => (/* binding */ matTooltipAnimations)
 /* harmony export */ });
-/* harmony import */ var _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/cdk/overlay */ 4244);
-/* harmony import */ var _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @angular/cdk/a11y */ 4128);
-/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! @angular/common */ 6362);
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/core */ 3184);
+/* harmony import */ var _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/cdk/overlay */ 4244);
+/* harmony import */ var _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @angular/cdk/a11y */ 4128);
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @angular/common */ 6362);
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /* harmony import */ var _angular_material_core__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! @angular/material/core */ 8133);
-/* harmony import */ var _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @angular/cdk/scrolling */ 5752);
-/* harmony import */ var _angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/cdk/coercion */ 6484);
-/* harmony import */ var _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @angular/cdk/keycodes */ 5939);
+/* harmony import */ var _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/cdk/scrolling */ 5752);
+/* harmony import */ var _angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @angular/cdk/coercion */ 6484);
+/* harmony import */ var _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/cdk/keycodes */ 5939);
 /* harmony import */ var _angular_cdk_layout__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! @angular/cdk/layout */ 9910);
-/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
-/* harmony import */ var _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @angular/cdk/portal */ 4476);
-/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs */ 228);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! rxjs/operators */ 8951);
-/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! rxjs/operators */ 9295);
-/* harmony import */ var _angular_animations__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/animations */ 1631);
-/* harmony import */ var _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! @angular/cdk/bidi */ 1588);
+/* harmony import */ var _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/cdk/platform */ 4390);
+/* harmony import */ var _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @angular/cdk/portal */ 4476);
+/* harmony import */ var _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! @angular/platform-browser/animations */ 3598);
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ 228);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs/operators */ 8951);
+/* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! rxjs/operators */ 9295);
+/* harmony import */ var _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @angular/cdk/bidi */ 1588);
+/* harmony import */ var _angular_animations__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! @angular/animations */ 1631);
 
 
 
@@ -96677,44 +97184,10 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-/**
- * @license
- * Copyright Google LLC All Rights Reserved.
- *
- * Use of this source code is governed by an MIT-style license that can be
- * found in the LICENSE file at https://angular.io/license
- */
 
-/**
- * Animations used by MatTooltip.
- * @docs-private
- */
-
-const matTooltipAnimations = {
-  /** Animation that transitions a tooltip in and out. */
-  tooltipState: (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.trigger)('state', [(0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.state)('initial, void, hidden', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    opacity: 0,
-    transform: 'scale(0)'
-  })), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.state)('visible', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    transform: 'scale(1)'
-  })), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.transition)('* => visible', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.animate)('200ms cubic-bezier(0, 0, 0.2, 1)', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.keyframes)([(0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    opacity: 0,
-    transform: 'scale(0)',
-    offset: 0
-  }), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    opacity: 0.5,
-    transform: 'scale(0.99)',
-    offset: 0.5
-  }), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    opacity: 1,
-    transform: 'scale(1)',
-    offset: 1
-  })]))), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.transition)('* => hidden', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.animate)('100ms cubic-bezier(0, 0, 0.2, 1)', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_0__.style)({
-    opacity: 0
-  })))])
-};
 /** Time in ms to throttle repositioning after scroll events. */
 
+const _c0 = ["tooltip"];
 const SCROLL_THROTTLE_MS = 20;
 /**
  * CSS class that will be attached to the overlay panel.
@@ -96726,7 +97199,7 @@ const TOOLTIP_PANEL_CLASS = 'mat-tooltip-panel';
 const PANEL_CLASS = 'tooltip-panel';
 /** Options used to bind passive event listeners. */
 
-const passiveListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.normalizePassiveListenerOptions)({
+const passiveListenerOptions = (0,_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.normalizePassiveListenerOptions)({
   passive: true
 });
 /**
@@ -96746,7 +97219,7 @@ function getMatTooltipInvalidPositionError(position) {
 /** Injection token that determines the scroll handling while a tooltip is visible. */
 
 
-const MAT_TOOLTIP_SCROLL_STRATEGY = new _angular_core__WEBPACK_IMPORTED_MODULE_2__.InjectionToken('mat-tooltip-scroll-strategy');
+const MAT_TOOLTIP_SCROLL_STRATEGY = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('mat-tooltip-scroll-strategy');
 /** @docs-private */
 
 function MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY(overlay) {
@@ -96759,12 +97232,12 @@ function MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY(overlay) {
 
 const MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY_PROVIDER = {
   provide: MAT_TOOLTIP_SCROLL_STRATEGY,
-  deps: [_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.Overlay],
+  deps: [_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.Overlay],
   useFactory: MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY
 };
 /** Injection token to be used to override the default options for `matTooltip`. */
 
-const MAT_TOOLTIP_DEFAULT_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODULE_2__.InjectionToken('mat-tooltip-default-options', {
+const MAT_TOOLTIP_DEFAULT_OPTIONS = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.InjectionToken('mat-tooltip-default-options', {
   providedIn: 'root',
   factory: MAT_TOOLTIP_DEFAULT_OPTIONS_FACTORY
 });
@@ -96820,21 +97293,7 @@ class _MatTooltipBase {
     this._passiveListeners = [];
     /** Emits when the component is destroyed. */
 
-    this._destroyed = new rxjs__WEBPACK_IMPORTED_MODULE_4__.Subject();
-    /**
-     * Handles the keydown events on the host element.
-     * Needs to be an arrow function so that we can use it in addEventListener.
-     */
-
-    this._handleKeydown = event => {
-      if (this._isTooltipVisible() && event.keyCode === _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_5__.ESCAPE && !(0,_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_5__.hasModifierKey)(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        this._ngZone.run(() => this.hide(0));
-      }
-    };
-
+    this._destroyed = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject();
     this._scrollStrategy = scrollStrategy;
     this._document = _document;
 
@@ -96848,14 +97307,10 @@ class _MatTooltipBase {
       }
     }
 
-    _dir.change.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(() => {
+    _dir.change.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(() => {
       if (this._overlayRef) {
         this._updatePosition(this._overlayRef);
       }
-    });
-
-    _ngZone.runOutsideAngular(() => {
-      _elementRef.nativeElement.addEventListener('keydown', this._handleKeydown);
     });
   }
   /** Allows the user to define the position of the tooltip relative to the parent element */
@@ -96888,7 +97343,7 @@ class _MatTooltipBase {
   }
 
   set disabled(value) {
-    this._disabled = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_7__.coerceBooleanProperty)(value); // If tooltip is disabled, hide immediately.
+    this._disabled = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_5__.coerceBooleanProperty)(value); // If tooltip is disabled, hide immediately.
 
     if (this._disabled) {
       this.hide(0);
@@ -96904,7 +97359,7 @@ class _MatTooltipBase {
   }
 
   set showDelay(value) {
-    this._showDelay = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_7__.coerceNumberProperty)(value);
+    this._showDelay = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_5__.coerceNumberProperty)(value);
   }
   /** The default delay in ms before hiding the tooltip after hide is called */
 
@@ -96914,7 +97369,11 @@ class _MatTooltipBase {
   }
 
   set hideDelay(value) {
-    this._hideDelay = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_7__.coerceNumberProperty)(value);
+    this._hideDelay = (0,_angular_cdk_coercion__WEBPACK_IMPORTED_MODULE_5__.coerceNumberProperty)(value);
+
+    if (this._tooltipInstance) {
+      this._tooltipInstance._mouseLeaveHideDelay = this._hideDelay;
+    }
   }
   /** The message to be displayed in the tooltip */
 
@@ -96970,7 +97429,7 @@ class _MatTooltipBase {
 
     this._setupPointerEnterEventsIfNeeded();
 
-    this._focusMonitor.monitor(this._elementRef).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(origin => {
+    this._focusMonitor.monitor(this._elementRef).pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(origin => {
       // Note that the focus monitor runs outside the Angular zone.
       if (!origin) {
         this._ngZone.run(() => this.hide(0));
@@ -96994,8 +97453,6 @@ class _MatTooltipBase {
       this._tooltipInstance = null;
     } // Clean up the event listeners set in the constructor
 
-
-    nativeElement.removeEventListener('keydown', this._handleKeydown);
 
     this._passiveListeners.forEach(([event, listener]) => {
       nativeElement.removeEventListener(event, listener, passiveListenerOptions);
@@ -97023,16 +97480,17 @@ class _MatTooltipBase {
 
     this._detach();
 
-    this._portal = this._portal || new _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_8__.ComponentPortal(this._tooltipComponent, this._viewContainerRef);
-    this._tooltipInstance = overlayRef.attach(this._portal).instance;
-
-    this._tooltipInstance.afterHidden().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(() => this._detach());
+    this._portal = this._portal || new _angular_cdk_portal__WEBPACK_IMPORTED_MODULE_6__.ComponentPortal(this._tooltipComponent, this._viewContainerRef);
+    const instance = this._tooltipInstance = overlayRef.attach(this._portal).instance;
+    instance._triggerElement = this._elementRef.nativeElement;
+    instance._mouseLeaveHideDelay = this._hideDelay;
+    instance.afterHidden().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(() => this._detach());
 
     this._setTooltipClass(this._tooltipClass);
 
     this._updateTooltipMessage();
 
-    this._tooltipInstance.show(delay);
+    instance.show(delay);
   }
   /** Hides the tooltip after the delay in ms, defaults to tooltip-delay-hide or 0ms if no input */
 
@@ -97058,6 +97516,8 @@ class _MatTooltipBase {
 
 
   _createOverlay() {
+    var _a;
+
     if (this._overlayRef) {
       return this._overlayRef;
     }
@@ -97067,7 +97527,7 @@ class _MatTooltipBase {
 
     const strategy = this._overlay.position().flexibleConnectedTo(this._elementRef).withTransformOriginOn(`.${this._cssClassPrefix}-tooltip`).withFlexibleDimensions(false).withViewportMargin(this._viewportMargin).withScrollableContainers(scrollableAncestors);
 
-    strategy.positionChanges.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(change => {
+    strategy.positionChanges.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(change => {
       this._updateCurrentPositionClass(change.connectionPair);
 
       if (this._tooltipInstance) {
@@ -97087,13 +97547,26 @@ class _MatTooltipBase {
 
     this._updatePosition(this._overlayRef);
 
-    this._overlayRef.detachments().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(() => this._detach());
+    this._overlayRef.detachments().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(() => this._detach());
 
-    this._overlayRef.outsidePointerEvents().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(() => {
+    this._overlayRef.outsidePointerEvents().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(() => {
       var _a;
 
       return (_a = this._tooltipInstance) === null || _a === void 0 ? void 0 : _a._handleBodyInteraction();
     });
+
+    this._overlayRef.keydownEvents().pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(event => {
+      if (this._isTooltipVisible() && event.keyCode === _angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_7__.ESCAPE && !(0,_angular_cdk_keycodes__WEBPACK_IMPORTED_MODULE_7__.hasModifierKey)(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        this._ngZone.run(() => this.hide(0));
+      }
+    });
+
+    if ((_a = this._defaultOptions) === null || _a === void 0 ? void 0 : _a.disableTooltipInteractivity) {
+      this._overlayRef.addPanelClass(`${this._cssClassPrefix}-tooltip-panel-non-interactive`);
+    }
 
     return this._overlayRef;
   }
@@ -97224,7 +97697,7 @@ class _MatTooltipBase {
 
       this._tooltipInstance._markForCheck();
 
-      this._ngZone.onMicrotaskEmpty.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_9__.take)(1), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_6__.takeUntil)(this._destroyed)).subscribe(() => {
+      this._ngZone.onMicrotaskEmpty.pipe((0,rxjs_operators__WEBPACK_IMPORTED_MODULE_8__.take)(1), (0,rxjs_operators__WEBPACK_IMPORTED_MODULE_4__.takeUntil)(this._destroyed)).subscribe(() => {
         if (this._tooltipInstance) {
           this._overlayRef.updatePosition();
         }
@@ -97343,7 +97816,15 @@ class _MatTooltipBase {
     const exitListeners = [];
 
     if (this._platformSupportsMouseEvents()) {
-      exitListeners.push(['mouseleave', () => this.hide()], ['wheel', event => this._wheelListener(event)]);
+      exitListeners.push(['mouseleave', event => {
+        var _a;
+
+        const newTarget = event.relatedTarget;
+
+        if (!newTarget || !((_a = this._overlayRef) === null || _a === void 0 ? void 0 : _a.overlayElement.contains(newTarget))) {
+          this.hide();
+        }
+      }], ['wheel', event => this._wheelListener(event)]);
     } else if (this.touchGestures !== 'off') {
       this._disableNativeGesturesIfNecessary();
 
@@ -97415,10 +97896,10 @@ class _MatTooltipBase {
 }
 
 _MatTooltipBase.ɵfac = function _MatTooltipBase_Factory(t) {
-  _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵinvalidFactory"]();
+  _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵinvalidFactory"]();
 };
 
-_MatTooltipBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineDirective"]({
+_MatTooltipBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineDirective"]({
   type: _MatTooltipBase,
   inputs: {
     position: ["matTooltipPosition", "position"],
@@ -97432,65 +97913,65 @@ _MatTooltipBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2_
 });
 
 (function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵsetClassMetadata"](_MatTooltipBase, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Directive
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](_MatTooltipBase, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Directive
   }], function () {
     return [{
-      type: _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.Overlay
+      type: _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.Overlay
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ElementRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ElementRef
     }, {
-      type: _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__.ScrollDispatcher
+      type: _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__.ScrollDispatcher
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ViewContainerRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewContainerRef
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.NgZone
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone
     }, {
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.Platform
     }, {
-      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.AriaDescriber
+      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.AriaDescriber
     }, {
-      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.FocusMonitor
+      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.FocusMonitor
     }, {
       type: undefined
     }, {
-      type: _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.Directionality
+      type: _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_11__.Directionality
     }, {
       type: undefined
     }, {
       type: undefined,
       decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
-        args: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.DOCUMENT]
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_angular_common__WEBPACK_IMPORTED_MODULE_12__.DOCUMENT]
       }]
     }];
   }, {
     position: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipPosition']
     }],
     disabled: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipDisabled']
     }],
     showDelay: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipShowDelay']
     }],
     hideDelay: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipHideDelay']
     }],
     touchGestures: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipTouchGestures']
     }],
     message: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltip']
     }],
     tooltipClass: [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Input,
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Input,
       args: ['matTooltipClass']
     }]
   });
@@ -97512,20 +97993,20 @@ class MatTooltip extends _MatTooltipBase {
 }
 
 MatTooltip.ɵfac = function MatTooltip_Factory(t) {
-  return new (t || MatTooltip)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.Overlay), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__.ScrollDispatcher), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ViewContainerRef), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.AriaDescriber), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.FocusMonitor), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](MAT_TOOLTIP_SCROLL_STRATEGY), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.Directionality, 8), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](MAT_TOOLTIP_DEFAULT_OPTIONS, 8), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_common__WEBPACK_IMPORTED_MODULE_13__.DOCUMENT));
+  return new (t || MatTooltip)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.Overlay), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ElementRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__.ScrollDispatcher), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewContainerRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.Platform), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.AriaDescriber), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.FocusMonitor), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](MAT_TOOLTIP_SCROLL_STRATEGY), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_11__.Directionality, 8), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](MAT_TOOLTIP_DEFAULT_OPTIONS, 8), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_common__WEBPACK_IMPORTED_MODULE_12__.DOCUMENT));
 };
 
-MatTooltip.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineDirective"]({
+MatTooltip.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineDirective"]({
   type: MatTooltip,
   selectors: [["", "matTooltip", ""]],
   hostAttrs: [1, "mat-tooltip-trigger"],
   exportAs: ["matTooltip"],
-  features: [_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵInheritDefinitionFeature"]]
+  features: [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵInheritDefinitionFeature"]]
 });
 
 (function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵsetClassMetadata"](MatTooltip, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Directive,
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](MatTooltip, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Directive,
     args: [{
       selector: '[matTooltip]',
       exportAs: 'matTooltip',
@@ -97535,52 +98016,52 @@ MatTooltip.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵ
     }]
   }], function () {
     return [{
-      type: _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.Overlay
+      type: _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.Overlay
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ElementRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ElementRef
     }, {
-      type: _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__.ScrollDispatcher
+      type: _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__.ScrollDispatcher
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ViewContainerRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewContainerRef
     }, {
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.NgZone
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgZone
     }, {
-      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_1__.Platform
+      type: _angular_cdk_platform__WEBPACK_IMPORTED_MODULE_0__.Platform
     }, {
-      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.AriaDescriber
+      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.AriaDescriber
     }, {
-      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.FocusMonitor
+      type: _angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.FocusMonitor
     }, {
       type: undefined,
       decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
         args: [MAT_TOOLTIP_SCROLL_STRATEGY]
       }]
     }, {
-      type: _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_12__.Directionality,
+      type: _angular_cdk_bidi__WEBPACK_IMPORTED_MODULE_11__.Directionality,
       decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Optional
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
       }]
     }, {
       type: undefined,
       decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Optional
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
       }, {
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
         args: [MAT_TOOLTIP_DEFAULT_OPTIONS]
       }]
     }, {
       type: undefined,
       decorators: [{
-        type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Inject,
-        args: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.DOCUMENT]
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_angular_common__WEBPACK_IMPORTED_MODULE_12__.DOCUMENT]
       }]
     }];
   }, null);
 })();
 
 class _TooltipComponentBase {
-  constructor(_changeDetectorRef) {
+  constructor(_changeDetectorRef, animationMode) {
     this._changeDetectorRef = _changeDetectorRef;
     /** Property watched by the animation framework to show or hide the tooltip */
 
@@ -97588,9 +98069,13 @@ class _TooltipComponentBase {
     /** Whether interactions on the page should close the tooltip */
 
     this._closeOnInteraction = false;
+    /** Whether the tooltip is currently visible. */
+
+    this._isVisible = false;
     /** Subject for notifying that the tooltip has been hidden from the view */
 
-    this._onHide = new rxjs__WEBPACK_IMPORTED_MODULE_4__.Subject();
+    this._onHide = new rxjs__WEBPACK_IMPORTED_MODULE_3__.Subject();
+    this._animationsDisabled = animationMode === 'NoopAnimations';
   }
   /**
    * Shows the tooltip with an animation originating from the provided origin
@@ -97600,18 +98085,11 @@ class _TooltipComponentBase {
 
   show(delay) {
     // Cancel the delayed hide if it is scheduled
-    clearTimeout(this._hideTimeoutId); // Body interactions should cancel the tooltip if there is a delay in showing.
-
-    this._closeOnInteraction = true;
+    clearTimeout(this._hideTimeoutId);
     this._showTimeoutId = setTimeout(() => {
-      this._visibility = 'visible';
+      this._toggleVisibility(true);
+
       this._showTimeoutId = undefined;
-
-      this._onShow(); // Mark for check so if any parent component has set the
-      // ChangeDetectionStrategy to OnPush it will be checked anyways
-
-
-      this._markForCheck();
     }, delay);
   }
   /**
@@ -97624,11 +98102,9 @@ class _TooltipComponentBase {
     // Cancel the delayed show if it is scheduled
     clearTimeout(this._showTimeoutId);
     this._hideTimeoutId = setTimeout(() => {
-      this._visibility = 'hidden';
-      this._hideTimeoutId = undefined; // Mark for check so if any parent component has set the
-      // ChangeDetectionStrategy to OnPush it will be checked anyways
+      this._toggleVisibility(false);
 
-      this._markForCheck();
+      this._hideTimeoutId = undefined;
     }, delay);
   }
   /** Returns an observable that notifies when the tooltip has been hidden from view. */
@@ -97641,7 +98117,7 @@ class _TooltipComponentBase {
 
 
   isVisible() {
-    return this._visibility === 'visible';
+    return this._isVisible;
   }
 
   ngOnDestroy() {
@@ -97649,22 +98125,8 @@ class _TooltipComponentBase {
     clearTimeout(this._hideTimeoutId);
 
     this._onHide.complete();
-  }
 
-  _animationStart() {
-    this._closeOnInteraction = false;
-  }
-
-  _animationDone(event) {
-    const toState = event.toState;
-
-    if (toState === 'hidden' && !this.isVisible()) {
-      this._onHide.next();
-    }
-
-    if (toState === 'visible' || toState === 'hidden') {
-      this._closeOnInteraction = true;
-    }
+    this._triggerElement = null;
   }
   /**
    * Interactions on the HTML body should close the tooltip immediately as defined in the
@@ -97688,6 +98150,14 @@ class _TooltipComponentBase {
   _markForCheck() {
     this._changeDetectorRef.markForCheck();
   }
+
+  _handleMouseLeave({
+    relatedTarget
+  }) {
+    if (!relatedTarget || !this._triggerElement.contains(relatedTarget)) {
+      this.hide(this._mouseLeaveHideDelay);
+    }
+  }
   /**
    * Callback for when the timeout in this.show() gets completed.
    * This method is only needed by the mdc-tooltip, and so it is only implemented
@@ -97696,23 +98166,84 @@ class _TooltipComponentBase {
 
 
   _onShow() {}
+  /** Event listener dispatched when an animation on the tooltip finishes. */
+
+
+  _handleAnimationEnd({
+    animationName
+  }) {
+    if (animationName === this._showAnimation || animationName === this._hideAnimation) {
+      this._finalizeAnimation(animationName === this._showAnimation);
+    }
+  }
+  /** Handles the cleanup after an animation has finished. */
+
+
+  _finalizeAnimation(toVisible) {
+    if (toVisible) {
+      this._closeOnInteraction = true;
+    } else if (!this.isVisible()) {
+      this._onHide.next();
+    }
+  }
+  /** Toggles the visibility of the tooltip element. */
+
+
+  _toggleVisibility(isVisible) {
+    // We set the classes directly here ourselves so that toggling the tooltip state
+    // isn't bound by change detection. This allows us to hide it even if the
+    // view ref has been detached from the CD tree.
+    const tooltip = this._tooltip.nativeElement;
+    const showClass = this._showAnimation;
+    const hideClass = this._hideAnimation;
+    tooltip.classList.remove(isVisible ? hideClass : showClass);
+    tooltip.classList.add(isVisible ? showClass : hideClass);
+    this._isVisible = isVisible; // It's common for internal apps to disable animations using `* { animation: none !important }`
+    // which can break the opening sequence. Try to detect such cases and work around them.
+
+    if (isVisible && !this._animationsDisabled && typeof getComputedStyle === 'function') {
+      const styles = getComputedStyle(tooltip); // Use `getPropertyValue` to avoid issues with property renaming.
+
+      if (styles.getPropertyValue('animation-duration') === '0s' || styles.getPropertyValue('animation-name') === 'none') {
+        this._animationsDisabled = true;
+      }
+    }
+
+    if (isVisible) {
+      this._onShow();
+    }
+
+    if (this._animationsDisabled) {
+      tooltip.classList.add('_mat-animation-noopable');
+
+      this._finalizeAnimation(isVisible);
+    }
+  }
 
 }
 
 _TooltipComponentBase.ɵfac = function _TooltipComponentBase_Factory(t) {
-  return new (t || _TooltipComponentBase)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ChangeDetectorRef));
+  return new (t || _TooltipComponentBase)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectorRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_13__.ANIMATION_MODULE_TYPE, 8));
 };
 
-_TooltipComponentBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineDirective"]({
+_TooltipComponentBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineDirective"]({
   type: _TooltipComponentBase
 });
 
 (function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵsetClassMetadata"](_TooltipComponentBase, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Directive
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](_TooltipComponentBase, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Directive
   }], function () {
     return [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ChangeDetectorRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectorRef
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_13__.ANIMATION_MODULE_TYPE]
+      }]
     }];
   }, null);
 })();
@@ -97723,89 +98254,120 @@ _TooltipComponentBase.ɵdir = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MOD
 
 
 class TooltipComponent extends _TooltipComponentBase {
-  constructor(changeDetectorRef, _breakpointObserver) {
-    super(changeDetectorRef);
+  constructor(changeDetectorRef, _breakpointObserver, animationMode) {
+    super(changeDetectorRef, animationMode);
     this._breakpointObserver = _breakpointObserver;
     /** Stream that emits whether the user has a handset-sized display.  */
 
     this._isHandset = this._breakpointObserver.observe(_angular_cdk_layout__WEBPACK_IMPORTED_MODULE_14__.Breakpoints.Handset);
+    this._showAnimation = 'mat-tooltip-show';
+    this._hideAnimation = 'mat-tooltip-hide';
   }
 
 }
 
 TooltipComponent.ɵfac = function TooltipComponent_Factory(t) {
-  return new (t || TooltipComponent)(_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_2__.ChangeDetectorRef), _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdirectiveInject"](_angular_cdk_layout__WEBPACK_IMPORTED_MODULE_14__.BreakpointObserver));
+  return new (t || TooltipComponent)(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectorRef), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_cdk_layout__WEBPACK_IMPORTED_MODULE_14__.BreakpointObserver), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdirectiveInject"](_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_13__.ANIMATION_MODULE_TYPE, 8));
 };
 
-TooltipComponent.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineComponent"]({
+TooltipComponent.ɵcmp = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineComponent"]({
   type: TooltipComponent,
   selectors: [["mat-tooltip-component"]],
+  viewQuery: function TooltipComponent_Query(rf, ctx) {
+    if (rf & 1) {
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵviewQuery"](_c0, 7);
+    }
+
+    if (rf & 2) {
+      let _t;
+
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵqueryRefresh"](_t = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵloadQuery"]()) && (ctx._tooltip = _t.first);
+    }
+  },
   hostAttrs: ["aria-hidden", "true"],
   hostVars: 2,
   hostBindings: function TooltipComponent_HostBindings(rf, ctx) {
+    if (rf & 1) {
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵlistener"]("mouseleave", function TooltipComponent_mouseleave_HostBindingHandler($event) {
+        return ctx._handleMouseLeave($event);
+      });
+    }
+
     if (rf & 2) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵstyleProp"]("zoom", ctx._visibility === "visible" ? 1 : null);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵstyleProp"]("zoom", ctx.isVisible() ? 1 : null);
     }
   },
-  features: [_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵInheritDefinitionFeature"]],
-  decls: 3,
-  vars: 7,
-  consts: [[1, "mat-tooltip", 3, "ngClass"]],
+  features: [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵInheritDefinitionFeature"]],
+  decls: 4,
+  vars: 6,
+  consts: [[1, "mat-tooltip", 3, "ngClass", "animationend"], ["tooltip", ""]],
   template: function TooltipComponent_Template(rf, ctx) {
     if (rf & 1) {
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementStart"](0, "div", 0);
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵlistener"]("@state.start", function TooltipComponent_Template_div_animation_state_start_0_listener() {
-        return ctx._animationStart();
-      })("@state.done", function TooltipComponent_Template_div_animation_state_done_0_listener($event) {
-        return ctx._animationDone($event);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵelementStart"](0, "div", 0, 1);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵlistener"]("animationend", function TooltipComponent_Template_div_animationend_0_listener($event) {
+        return ctx._handleAnimationEnd($event);
       });
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵpipe"](1, "async");
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵtext"](2);
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵelementEnd"]();
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵpipe"](2, "async");
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵtext"](3);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵelementEnd"]();
     }
 
     if (rf & 2) {
       let tmp_0_0;
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵclassProp"]("mat-tooltip-handset", (tmp_0_0 = _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵpipeBind1"](1, 5, ctx._isHandset)) == null ? null : tmp_0_0.matches);
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵproperty"]("ngClass", ctx.tooltipClass)("@state", ctx._visibility);
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵadvance"](2);
-      _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵtextInterpolate"](ctx.message);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵclassProp"]("mat-tooltip-handset", (tmp_0_0 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵpipeBind1"](2, 4, ctx._isHandset)) == null ? null : tmp_0_0.matches);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵproperty"]("ngClass", ctx.tooltipClass);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵadvance"](3);
+      _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵtextInterpolate"](ctx.message);
     }
   },
-  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.NgClass],
-  pipes: [_angular_common__WEBPACK_IMPORTED_MODULE_13__.AsyncPipe],
-  styles: [".mat-tooltip-panel{pointer-events:none !important}.mat-tooltip{color:#fff;border-radius:4px;margin:14px;max-width:250px;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis}.cdk-high-contrast-active .mat-tooltip{outline:solid 1px}.mat-tooltip-handset{margin:24px;padding-left:16px;padding-right:16px}\n"],
+  directives: [_angular_common__WEBPACK_IMPORTED_MODULE_12__.NgClass],
+  pipes: [_angular_common__WEBPACK_IMPORTED_MODULE_12__.AsyncPipe],
+  styles: [".mat-tooltip{color:#fff;border-radius:4px;margin:14px;max-width:250px;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis;transform:scale(0)}.mat-tooltip._mat-animation-noopable{animation:none;transform:scale(1)}.cdk-high-contrast-active .mat-tooltip{outline:solid 1px}.mat-tooltip-handset{margin:24px;padding-left:16px;padding-right:16px}.mat-tooltip-panel-non-interactive{pointer-events:none}@keyframes mat-tooltip-show{0%{opacity:0;transform:scale(0)}50%{opacity:.5;transform:scale(0.99)}100%{opacity:1;transform:scale(1)}}@keyframes mat-tooltip-hide{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1)}}.mat-tooltip-show{animation:mat-tooltip-show 200ms cubic-bezier(0, 0, 0.2, 1) forwards}.mat-tooltip-hide{animation:mat-tooltip-hide 100ms cubic-bezier(0, 0, 0.2, 1) forwards}\n"],
   encapsulation: 2,
-  data: {
-    animation: [matTooltipAnimations.tooltipState]
-  },
   changeDetection: 0
 });
 
 (function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵsetClassMetadata"](TooltipComponent, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.Component,
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](TooltipComponent, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Component,
     args: [{
       selector: 'mat-tooltip-component',
-      encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ViewEncapsulation.None,
-      changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ChangeDetectionStrategy.OnPush,
-      animations: [matTooltipAnimations.tooltipState],
+      encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewEncapsulation.None,
+      changeDetection: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectionStrategy.OnPush,
       host: {
         // Forces the element to have a layout in IE and Edge. This fixes issues where the element
         // won't be rendered if the animations are disabled or there is no web animations polyfill.
-        '[style.zoom]': '_visibility === "visible" ? 1 : null',
+        '[style.zoom]': 'isVisible() ? 1 : null',
+        '(mouseleave)': '_handleMouseLeave($event)',
         'aria-hidden': 'true'
       },
-      template: "<div class=\"mat-tooltip\"\n     [ngClass]=\"tooltipClass\"\n     [class.mat-tooltip-handset]=\"(_isHandset | async)?.matches\"\n     [@state]=\"_visibility\"\n     (@state.start)=\"_animationStart()\"\n     (@state.done)=\"_animationDone($event)\">{{message}}</div>\n",
-      styles: [".mat-tooltip-panel{pointer-events:none !important}.mat-tooltip{color:#fff;border-radius:4px;margin:14px;max-width:250px;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis}.cdk-high-contrast-active .mat-tooltip{outline:solid 1px}.mat-tooltip-handset{margin:24px;padding-left:16px;padding-right:16px}\n"]
+      template: "<div #tooltip\n     class=\"mat-tooltip\"\n     (animationend)=\"_handleAnimationEnd($event)\"\n     [ngClass]=\"tooltipClass\"\n     [class.mat-tooltip-handset]=\"(_isHandset | async)?.matches\">{{message}}</div>\n",
+      styles: [".mat-tooltip{color:#fff;border-radius:4px;margin:14px;max-width:250px;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis;transform:scale(0)}.mat-tooltip._mat-animation-noopable{animation:none;transform:scale(1)}.cdk-high-contrast-active .mat-tooltip{outline:solid 1px}.mat-tooltip-handset{margin:24px;padding-left:16px;padding-right:16px}.mat-tooltip-panel-non-interactive{pointer-events:none}@keyframes mat-tooltip-show{0%{opacity:0;transform:scale(0)}50%{opacity:.5;transform:scale(0.99)}100%{opacity:1;transform:scale(1)}}@keyframes mat-tooltip-hide{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1)}}.mat-tooltip-show{animation:mat-tooltip-show 200ms cubic-bezier(0, 0, 0.2, 1) forwards}.mat-tooltip-hide{animation:mat-tooltip-hide 100ms cubic-bezier(0, 0, 0.2, 1) forwards}\n"]
     }]
   }], function () {
     return [{
-      type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.ChangeDetectorRef
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ChangeDetectorRef
     }, {
       type: _angular_cdk_layout__WEBPACK_IMPORTED_MODULE_14__.BreakpointObserver
+    }, {
+      type: undefined,
+      decorators: [{
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Optional
+      }, {
+        type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.Inject,
+        args: [_angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_13__.ANIMATION_MODULE_TYPE]
+      }]
     }];
-  }, null);
+  }, {
+    _tooltip: [{
+      type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.ViewChild,
+      args: ['tooltip', {
+        // Use a static query here since we interact directly with
+        // the DOM which can happen before `ngAfterViewInit`.
+        static: true
+      }]
+    }]
+  });
 })();
 /**
  * @license
@@ -97822,25 +98384,62 @@ MatTooltipModule.ɵfac = function MatTooltipModule_Factory(t) {
   return new (t || MatTooltipModule)();
 };
 
-MatTooltipModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineNgModule"]({
+MatTooltipModule.ɵmod = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineNgModule"]({
   type: MatTooltipModule
 });
-MatTooltipModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵɵdefineInjector"]({
+MatTooltipModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵɵdefineInjector"]({
   providers: [MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY_PROVIDER],
-  imports: [[_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.A11yModule, _angular_common__WEBPACK_IMPORTED_MODULE_13__.CommonModule, _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.OverlayModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule, _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__.CdkScrollableModule]
+  imports: [[_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.A11yModule, _angular_common__WEBPACK_IMPORTED_MODULE_12__.CommonModule, _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.OverlayModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule], _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule, _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__.CdkScrollableModule]
 });
 
 (function () {
-  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_2__["ɵsetClassMetadata"](MatTooltipModule, [{
-    type: _angular_core__WEBPACK_IMPORTED_MODULE_2__.NgModule,
+  (typeof ngDevMode === "undefined" || ngDevMode) && _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵsetClassMetadata"](MatTooltipModule, [{
+    type: _angular_core__WEBPACK_IMPORTED_MODULE_1__.NgModule,
     args: [{
-      imports: [_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_11__.A11yModule, _angular_common__WEBPACK_IMPORTED_MODULE_13__.CommonModule, _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_3__.OverlayModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule],
-      exports: [MatTooltip, TooltipComponent, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule, _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_10__.CdkScrollableModule],
+      imports: [_angular_cdk_a11y__WEBPACK_IMPORTED_MODULE_10__.A11yModule, _angular_common__WEBPACK_IMPORTED_MODULE_12__.CommonModule, _angular_cdk_overlay__WEBPACK_IMPORTED_MODULE_2__.OverlayModule, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule],
+      exports: [MatTooltip, TooltipComponent, _angular_material_core__WEBPACK_IMPORTED_MODULE_15__.MatCommonModule, _angular_cdk_scrolling__WEBPACK_IMPORTED_MODULE_9__.CdkScrollableModule],
       declarations: [MatTooltip, TooltipComponent],
       providers: [MAT_TOOLTIP_SCROLL_STRATEGY_FACTORY_PROVIDER]
     }]
   }], null, null);
 })();
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+/**
+ * Animations used by MatTooltip.
+ * @docs-private
+ */
+
+
+const matTooltipAnimations = {
+  /** Animation that transitions a tooltip in and out. */
+  tooltipState: (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.trigger)('state', [(0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.state)('initial, void, hidden', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    opacity: 0,
+    transform: 'scale(0)'
+  })), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.state)('visible', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    transform: 'scale(1)'
+  })), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.transition)('* => visible', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.animate)('200ms cubic-bezier(0, 0, 0.2, 1)', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.keyframes)([(0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    opacity: 0,
+    transform: 'scale(0)',
+    offset: 0
+  }), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    opacity: 0.5,
+    transform: 'scale(0.99)',
+    offset: 0.5
+  }), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    opacity: 1,
+    transform: 'scale(1)',
+    offset: 1
+  })]))), (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.transition)('* => hidden', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.animate)('100ms cubic-bezier(0, 0, 0.2, 1)', (0,_angular_animations__WEBPACK_IMPORTED_MODULE_16__.style)({
+    opacity: 0
+  })))])
+};
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -97860,7 +98459,6 @@ MatTooltipModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_2
 /**
  * Generated bundle index. Do not edit.
  */
-
 
 
 
@@ -97889,8 +98487,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_animations_browser__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/animations/browser */ 289);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ 6362);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -98653,8 +99251,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/common */ 6362);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ 3184);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -101385,7 +101983,7 @@ DomSanitizerImpl.ɵprov = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Version('13.1.1');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_1__.Version('13.1.3');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -101510,8 +102108,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var rxjs_operators__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! rxjs/operators */ 1308);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! @angular/common */ 6362);
 /**
- * @license Angular v13.1.1
- * (c) 2010-2021 Google LLC. https://angular.io/
+ * @license Angular v13.1.3
+ * (c) 2010-2022 Google LLC. https://angular.io/
  * License: MIT
  */
 
@@ -108581,8 +109179,7 @@ RouterModule.ɵinj = /* @__PURE__ */_angular_core__WEBPACK_IMPORTED_MODULE_0__["
     type: _angular_core__WEBPACK_IMPORTED_MODULE_0__.NgModule,
     args: [{
       declarations: ROUTER_DIRECTIVES,
-      exports: ROUTER_DIRECTIVES,
-      entryComponents: [ɵEmptyOutletComponent]
+      exports: ROUTER_DIRECTIVES
     }]
   }], function () {
     return [{
@@ -108865,7 +109462,7 @@ function provideRouterInitializer() {
  */
 
 
-const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.1');
+const VERSION = new _angular_core__WEBPACK_IMPORTED_MODULE_0__.Version('13.1.3');
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
